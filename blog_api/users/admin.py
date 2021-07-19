@@ -13,8 +13,14 @@ class UserAdmin(auth_admin.UserAdmin):
 
     form = UserChangeForm
     add_form = UserCreationForm
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2', ),
+        }),
+    )
     fieldsets = (
-        (_("General"), {"fields": ("pub_id", "username", "password")}),
+        (_("General"), {"fields": ("pub_id", "ip_address", "username", "password")}),
         (_("Personal info"), {"fields": ("name", "email")}),
         (
             _("Permissions"),
@@ -40,9 +46,9 @@ class UserAdmin(auth_admin.UserAdmin):
             }
         ),
     )
-    list_display = ["username", "name", "email", "is_superuser", "is_staff",]
+    list_display = ["username", "name", "email", "is_superuser", "is_staff", "ip_address", "is_active",]
     search_fields = ["name", "email",]
-    readonly_fields = ["pub_id", "created_at", "updated_at",]
+    readonly_fields = ["pub_id", "created_at", "updated_at", "ip_address",]
 
 
 @admin.register(VerificationCode)
@@ -55,12 +61,12 @@ class VerificationCodeAdmin(admin.ModelAdmin):
                     "verification_code", 
                     "user_to_verify", 
                     "code_expiration", 
-                    "is_verified",
+                    # "is_verified",
                 )
             }
         ),
     )
-    list_display = ["verification_code", "user_to_verify", "code_expiration", "is_verified",]
+    list_display = ["verification_code", "user_to_verify", "code_expiration",] # is_verified
     search_fields = []
     readonly_fields = ["verification_code","created_at", "updated_at",]
 

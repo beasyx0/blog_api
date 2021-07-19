@@ -11,10 +11,6 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError
 
-from django.contrib.auth import authenticate
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
@@ -22,6 +18,8 @@ User = get_user_model()
 
 from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer
 from blog_api.users.models import VerificationCode, PasswordResetCode
+from blog_api.users.signals import new_registration
+from blog_api.users.utils import get_client_ip
 
 
 @api_view(['POST'])
@@ -39,6 +37,7 @@ def user_register(request):
        message on wether existing user is active or not.
     2) Checks if name in request is blank or none. If so adds email name as name.
     3) Attempts to serialize and save new user. Returns 201 for created 400 for errors.
+    4) Record the users ip address for metrics.
     '''
     user_desired_email = request.data.get('email', None)
     user_email_exists = User.objects.filter(email=user_desired_email).exists()  # 1
@@ -73,6 +72,13 @@ def user_register(request):
     serializer = RegisterSerializer(data=request.data)  # 3
     if serializer.is_valid():
         serializer.save()
+        
+        user_username = serializer.data['username']  # 4
+        user_ip_address = get_client_ip(request)
+        new_registration.send(
+            sender='new_registration_done', ip_address=user_ip_address, user_username=user_username, task_id=299
+        )
+
         return Response({
                 'registered': True,
                 'message': 'User registered successfully, please check your email to verify.'
@@ -301,7 +307,6 @@ def user_password_reset_send(request):
             }, status=HTTP_400_BAD_REQUEST
         )
 
-# todo: add booleans to ALL return dicts
 
 @api_view(['POST'])
 @permission_classes((AllowAny,))
@@ -318,9 +323,7 @@ def user_password_reset(request):
     3) Checks that both new passwords match. If no returns 400 and message.
     4) Attempts to get the password code object. If no returns 400 and message.
     5) Checks to ensure the password reset code is not expired. If so returns 200 and message.
-    6) Validates the provided passwords and makes sure they are valid. If no returns 400 and message.
-    7) Sets new password for user. Returns 200 and message.
-    8) Sets the password code object expired. Returns 200 and message. 
+    6) Calls reset_password on the user object. Returns the appropriate status and message.
     '''
     password_reset_code = request.data.get('password_reset_code', None)  # 1
     if not password_reset_code:
@@ -357,26 +360,21 @@ def user_password_reset(request):
             )
         user = password_reset_code_object.user
 
-        try:
-            validate_password(password, user)  # 6
-        except ValidationError:
+        reset = user.password_reset(password)  # 6
+
+        if not reset['password_reset']:
             return Response({
-                    'password_reset': False,
-                    'message': 'Please make sure your passwords match, are at least 8 characters long, include a number and is not too common.',
+                    'password_reset': reset['password_reset'],
+                    'message': reset['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
 
-        user.set_password(password)  # 7
-        user.save()
-
-        password_reset_code_object.code_expiration = password_reset_code_object.code_expiration - timedelta(days=1000)  # 8
-        password_reset_code_object.save()
-
         return Response({
-                'password_reset': True,
-                'message': 'Password reset! Please continue to login.'
+                'password_reset': reset['password_reset'],
+                'message': reset['message']
             }, status=HTTP_200_OK
         )
+
     except PasswordResetCode.DoesNotExist:
         return Response({
                 'password_reset': False,

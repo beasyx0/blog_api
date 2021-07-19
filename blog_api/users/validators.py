@@ -10,6 +10,4 @@ class SpecialCharacterRequiredValidator:
             )
 
     def get_help_text(self):
-        return _(
-            "Your password must contain a special character."
-        )
+        return "Your password must contain a special character."

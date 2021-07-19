@@ -72,8 +72,8 @@ class UserTestsCreate(APITestCase):
     def test_user_register_new_account(self):
         """
         Ensure we can create a new user and that the user is_active == False,
-        that BaseModel saved correctly and that a new VerificationCode is
-        created.
+        that BaseModel saved correctly, a new VerificationCode is
+        created and user ip recorded.
         """
         print('Testing registering new user')
         url = reverse('user-register')
@@ -87,6 +87,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(User.objects.last().is_active, False)
         self.assertEqual(User.objects.last().created_at.date(), now.date())
         self.assertEqual(User.objects.last().updated_at.date(), now.date())
+        self.assertNotEqual(User.objects.last().ip_address, None)
         self.assertEqual(VerificationCode.objects.count(), 1)
         print('Done.....')
 
@@ -258,7 +259,6 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
         self.assertEqual(verification_response.data['verified'], True)
         self.assertEqual(verification_response.data['message'], 'Code verified and the user is now active! You may now log in.')
-        self.assertEqual(VerificationCode.objects.last().is_verified, True)
         print('Done.....')
 
     def test_user_verify_fails_wrong_code(self):
@@ -393,7 +393,6 @@ class UserTestsCreate(APITestCase):
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
         self.assertEqual(verification_response.data['verified'], True)
-        self.assertEqual(VerificationCode.objects.last().is_verified, True)
 
         password_reset_send_data = {'email': self.user_data['email']}
         password_reset_send_response = self.client.post(password_reset_send_url, password_reset_send_data)
@@ -420,7 +419,6 @@ class UserTestsCreate(APITestCase):
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
         self.assertEqual(verification_response.data['verified'], True)
-        self.assertEqual(VerificationCode.objects.last().is_verified, True)
 
         password_reset_send_data = {'email': self.user_data['email']}
         password_reset_send_response = self.client.post(password_reset_send_url, password_reset_send_data)
@@ -437,7 +435,7 @@ class UserTestsCreate(APITestCase):
         password_reset_response = self.client.post(password_reset_url, password_reset_data, format='json')
         self.assertEqual(password_reset_response.status_code, HTTP_200_OK)
         self.assertEqual(password_reset_response.data['password_reset'], True)
-        self.assertEqual(password_reset_response.data['message'], 'Password reset! Please continue to login.')
+        self.assertEqual(password_reset_response.data['message'], 'The password has been reset. Please continue to log in.')
 
         print('Done.....')
 
@@ -457,7 +455,6 @@ class UserTestsCreate(APITestCase):
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
         self.assertEqual(verification_response.data['verified'], True)
-        self.assertEqual(VerificationCode.objects.last().is_verified, True)
 
         password_reset_send_data = {'email': self.user_data['email']}
         password_reset_send_response = self.client.post(password_reset_send_url, password_reset_send_data)
@@ -494,7 +491,6 @@ class UserTestsCreate(APITestCase):
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
         self.assertEqual(verification_response.data['verified'], True)
-        self.assertEqual(VerificationCode.objects.last().is_verified, True)
 
         password_reset_send_data = {'email': self.user_data['email']}
         password_reset_send_response = self.client.post(password_reset_send_url, password_reset_send_data)
@@ -513,7 +509,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(password_reset_response.data['password_reset'], False)
         self.assertEqual(
             password_reset_response.data['message'], 
-            'Please make sure your passwords match, are at least 8 characters long, include a number and is not too common.'
+            'The password is not valid. Please choose one that is more secure.'
         )
 
         print('Done.....')

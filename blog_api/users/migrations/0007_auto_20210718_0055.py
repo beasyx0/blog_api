@@ -25,7 +25,6 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(editable=False, null=True)),
                 ('updated_at', models.DateTimeField(editable=False, null=True)),
-                ('password_reset_link', models.URLField()),
                 ('password_reset_code', models.CharField(editable=False, max_length=50, unique=True)),
                 ('code_expiration', models.DateTimeField(default=datetime.datetime(2021, 7, 21, 0, 55, 39, 55197, tzinfo=utc))),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='password_reset_links', to=settings.AUTH_USER_MODEL)),

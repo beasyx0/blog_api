@@ -3,11 +3,13 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.password_validation import validate_password
 from django.urls import reverse
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
 
 
 class BaseModel(models.Model):
@@ -28,11 +30,38 @@ class BaseModel(models.Model):
 class User(BaseModel, AbstractUser):
     '''User model. New users are inactive until verified through email'''
     pub_id = models.CharField(editable=False, unique=True, max_length=50)
-    name = models.CharField(blank=True, max_length=255)
-    email = models.EmailField(unique=True, blank=False, max_length=254)
+    name = models.CharField(blank=True, null=True, max_length=255)
+    email = models.EmailField(unique=True, blank=False, null=False, max_length=254)
     first_name = None
     last_name = None
     is_active = models.BooleanField(default=False)
+    ip_address = models.GenericIPAddressField(editable=False, blank=True, null=True)
+
+    def password_reset(self, password):
+        try:
+            validate_password(password, self)
+        except ValidationError:
+            return {
+                'password_reset': False,
+                'message': 'The password is not valid. Please choose one that is more secure.'
+            }
+        self.set_password(password)
+        self.save()
+
+        password_reset_codes_exist = self.password_reset_codes.all().exists()
+        if password_reset_codes_exist:
+            now = timezone.now()
+            for code in self.password_reset_codes.all():
+                code.code_expiration = (now - timedelta(days=100))
+                code.save()
+
+        return {
+            'password_reset': True,
+            'message': 'The password has been reset. Please continue to log in.'
+        }
+
+    class Meta:
+        ordering = ['-created_at', 'is_active',]
 
     def save(self, *args, **kwargs):
         '''
@@ -49,7 +78,6 @@ class VerificationCode(BaseModel):
     verification_code = models.CharField(editable=False, unique=True, max_length=50)
     user_to_verify = models.ForeignKey(User, related_name='verification_codes', on_delete=models.CASCADE)
     code_expiration = models.DateTimeField(default=timezone.now() + timedelta(days=3))
-    is_verified = models.BooleanField(default=False)
 
     def send_user_verification_email(self):
 
@@ -89,7 +117,8 @@ class VerificationCode(BaseModel):
         :returns: dict
         1) Checks that the code has not expired. If so returns verified False.
         2) Checks if the code has already been verified. If so returns verified True.
-        3) Updates self to verified and sets the user to active. Returns veified True.
+        3) Sets the code to expired.
+        4) Sets the user to is active and returns 200 and a message.
         '''
         now = timezone.now()
         if not (self.code_expiration >= now):  # 1
@@ -98,24 +127,19 @@ class VerificationCode(BaseModel):
                 'verified': False,
                 'message': 'Code expired, please re-register first then check your email'
             }
-        elif (self.is_verified == True):  # 2
-            return {
-                'verified': True,
-                'message': 'Code is already verified, please log in.'
-            }
         else:
-            self.is_verified = True
-            self.user_to_verify.is_active = True  # 3 this needs to expire the code
+            self.code_expiration = (now - timedelta(days=100))  # 3
             self.save()
+            self.user_to_verify.is_active = True  # 4
             self.user_to_verify.save()
+
             return {
                 'verified': True,
                 'message': 'Code verified and the user is now active! You may now log in.'
             }
 
     class Meta:
-        verbose_name = 'Verification Code'
-        verbose_name_plural = 'Verification Codes'
+        ordering = ['-created_at']
 
     def __str__(self):
         return str(self.verification_code)
@@ -132,9 +156,9 @@ class VerificationCode(BaseModel):
 
 class PasswordResetCode(BaseModel):
     '''
-    --Password reset link--
+    --Password reset code--
     '''
-    user = models.ForeignKey(User, related_name='password_reset_links', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name='password_reset_codes', on_delete=models.CASCADE)
     password_reset_code = models.CharField(editable=False, unique=True, max_length=50)
     code_expiration = models.DateTimeField(default=timezone.now() + timedelta(days=3))
 
@@ -168,6 +192,9 @@ class PasswordResetCode(BaseModel):
             'password_reset_link_sent': True,
             'message': 'Password reset link sent! Check your email.'
         }
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return str(self.password_reset_code)

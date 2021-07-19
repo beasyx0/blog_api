@@ -27,7 +27,6 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(editable=False, null=True)),
                 ('verification_code', models.UUIDField(editable=False, unique=True)),
                 ('code_expiration', models.DateTimeField(default=datetime.datetime(2021, 7, 16, 2, 29, 16, 338295, tzinfo=utc))),
-                ('is_verified', models.BooleanField(default=False)),
                 ('user_to_verify', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='verification_codes', to=settings.AUTH_USER_MODEL)),
             ],
             options={

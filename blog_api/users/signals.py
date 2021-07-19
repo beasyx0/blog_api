@@ -1,6 +1,10 @@
 from django.db.models import signals
+from django.dispatch import Signal
 from django.db import transaction
 from django.dispatch import receiver
+from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 from blog_api.users.models import User, VerificationCode, PasswordResetCode
 
@@ -15,10 +19,12 @@ def send_user_verification_email_signal(sender, instance, created, **kwargs):
         )
 
 
-# @receiver(signals.post_save, sender=PasswordResetCode)
-# def send_user_password_reset_email_signal(sender, instance, created, **kwargs):
-#     '''Send user password reset link'''
-#     if created:
-#         transaction.on_commit(
-#             lambda: instance.send_user_password_reset_email()
-#         )
+new_registration = Signal(providing_args=["ip_address", "user_username"])
+
+@receiver(new_registration)
+def record_ip_on_new_registration(sender, task_id, **kwargs):
+    username = kwargs['user_username']
+    ip_address = kwargs['ip_address']
+    user = get_object_or_404(User, username=username)
+    user.ip_address = ip_address
+    user.save()
