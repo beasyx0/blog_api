@@ -108,7 +108,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
             response2.data.get('message'), 
-            'An account for that user already exists and is inactive. Please try to resend verification email to reactivate.'
+            'An account for that user already exists and is inactive. Please check your email for a new verification.'
         )
         
         verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}
@@ -140,7 +140,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
             response2.data.get('message'), 
-            'An account for that user already exists and is inactive. Please try to resend verification email to reactivate.'
+            'An account for that user already exists and is inactive. Please check your email for a new verification.'
         )
         
         verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}  # verify user
@@ -164,7 +164,10 @@ class UserTestsCreate(APITestCase):
         response2 = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(response2.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(response2.data['registered'], False)
-        self.assertEqual(response2.data['message'], 'An account for that user already exists and is inactive. Please try to resend verification email to reactivate.')
+        self.assertEqual(
+            response2.data['message'], 
+            'An account for that user already exists and is inactive. Please check your email for a new verification.'
+        )
 
     def test_user_register_new_account_name_not_required(self):
         """
@@ -342,11 +345,12 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(resend_response.data['verifification_sent'], False)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_user_resend_verification_email_fails_expired_and_deletes_user(self):
+    def test_user_resend_verification_email_expired_resends_new_verification(self):
         """
-        Ensure we cannot resend the verification email if it's expired. Also ensure the user is deleted and told to re-register
+        Ensure the user recieves new verification email with new code and expiration if he tries to 
+        resend the verification email while code is expired.
         """
-        print('Testing cannot resend verification email when its expired and that user is deleted')
+        print('Testing expired verification gets resent with no code and expiration')
         register_url = reverse('user-register')
         verify_resend_url = reverse('user-verify-resend')
         
@@ -362,16 +366,18 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(resend_response.status_code, HTTP_200_OK)
         self.assertEqual(resend_response.data['verifification_sent'], True)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(resend_response.data['message'], 'Verification code sent! Check your email.')
 
         verification_code = VerificationCode.objects.last()
         verification_code.code_expiration = verification_code.code_expiration - timedelta(days=30)
         verification_code.save()
 
+        now_day = (timezone.now() + timedelta(days=3)).day
         expired_resend_response = self.client.post(verify_resend_url, resend_data)
-        self.assertEqual(expired_resend_response.status_code, HTTP_400_BAD_REQUEST)
-        self.assertEqual(expired_resend_response.data['verifification_sent'], False)
-        self.assertEqual(User.objects.all().count(), 0)
-        self.assertEqual(expired_resend_response.data['message'], 'Code expired, please re-register first then check your email.')
+        self.assertEqual(expired_resend_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(expired_resend_response.data['message'], 'Verification code sent! Check your email.')
+        self.assertEqual(now_day, verification_code.code_expiration.day)
 
         print('Done.....')
 
@@ -400,6 +406,41 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(password_reset_send_response.data['password_reset_link_sent'], True)
         self.assertEqual(password_reset_send_response.data['message'], 'Password reset link sent! Check your email.')
 
+
+        print('Done.....')
+
+    def test_user_send_password_reset_link_expired_resends_new_password_reset_link(self):
+        '''
+        Ensure that a user recieves a new password reset link in his email with a new code and expiration if he 
+        tries to get one and one already exist.
+        '''
+        print('Testing user recieves new password reset link with new code and expiration if one exists and is expired')
+        register_url = reverse('user-register')
+        password_resend_url = reverse('user-password-reset-send')
+        
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+        
+        resend_data = {
+            'email': self.user_data['email'],
+        }
+        resend_response = self.client.post(password_resend_url, resend_data)
+        self.assertEqual(resend_response.status_code, HTTP_200_OK)
+        self.assertEqual(resend_response.data['password_reset_link_sent'], True)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(resend_response.data['message'], 'Password reset link sent! Check your email.')
+
+        password_reset_code = PasswordResetCode.objects.last()
+        password_reset_code.code_expiration = password_reset_code.code_expiration - timedelta(days=30)
+        password_reset_code.save()
+
+        now_day = (timezone.now() + timedelta(days=3)).day
+        expired_resend_response = self.client.post(password_resend_url, resend_data)
+        self.assertEqual(expired_resend_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(expired_resend_response.data['message'], 'Password reset link sent! Check your email.')
+        self.assertEqual(now_day, password_reset_code.code_expiration.day)
 
         print('Done.....')
 
@@ -436,6 +477,34 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(password_reset_response.status_code, HTTP_200_OK)
         self.assertEqual(password_reset_response.data['password_reset'], True)
         self.assertEqual(password_reset_response.data['message'], 'The password has been reset. Please continue to log in.')
+
+        print('Done.....')
+
+    def test_user_reset_password_fails_not_email(self):
+        '''
+        Ensure the send reset password requires an email.
+        '''
+        print('Testing user send password reset fails without email')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        password_reset_send_url = reverse('user-password-reset-send')
+        password_reset_url = reverse('user-password-reset')
+        
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.last().verification_code
+        }
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        self.assertEqual(verification_response.data['verified'], True)
+
+        password_reset_send_data = {'email': ''}
+        password_reset_send_response = self.client.post(password_reset_send_url, password_reset_send_data)
+        self.assertEqual(password_reset_send_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(password_reset_send_response.data['password_reset_link_sent'], False)
+        self.assertEqual(password_reset_send_response.data['message'], 'Please post a valid email to get reset password link.')
 
         print('Done.....')
 

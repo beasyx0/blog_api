@@ -84,17 +84,16 @@ class VerificationCode(BaseModel):
         '''
         --Send user verification email--
         Sends user a verification code email using user.email_user(), the link sent
-        points to settings.FRONTEND_URL. If code is expired user is deleted.
+        points to settings.FRONTEND_URL. If code is expired then code is rotated and
+        expiration extended.
         '''
         now = timezone.now()
-        user = self.user_to_verify
         if not (self.code_expiration >= now):
-            user.delete()
-            return {
-                'verification_sent': False,
-                'message': 'Code expired, please re-register first then check your email.'
-            }
-        subject = f'{user.username}, please verify your email'
+            self.code_expiration = now + timedelta(days=3)
+            self.verification_code = str(uuid.uuid4().hex)
+            self.save()
+
+        subject = f'{self.user_to_verify.username}, please verify your email'
         template = 'email_templates/verification_email.txt'
         html_template = 'email_templates/verification_email.html'
         message_data = {
@@ -105,7 +104,7 @@ class VerificationCode(BaseModel):
         from_email = (
             'verification@' + settings.FRONTEND_URL.split('.')[-2] + '.com'
         )
-        user.email_user(subject=subject, message=message, html_message=html_message, from_email=from_email)
+        self.user_to_verify.email_user(subject=subject, message=message, html_message=html_message, from_email=from_email)
         return {
             'verification_sent': True,
             'message': 'Verification code sent! Check your email.'
@@ -114,29 +113,26 @@ class VerificationCode(BaseModel):
     def verify(self):
         '''
         --Code verification--
-        :returns: dict
-        1) Checks that the code has not expired. If so returns verified False.
-        2) Checks if the code has already been verified. If so returns verified True.
-        3) Sets the code to expired.
-        4) Sets the user to is active and returns 200 and a message.
+        1) If the code is expired then resend verification email return False and message.
+        2) Expire the code.
+        3) Set user to active and return True and message.
         '''
         now = timezone.now()
         if not (self.code_expiration >= now):  # 1
-            self.user_to_verify.delete()
+            self.send_user_verification_email()
             return {
                 'verified': False,
-                'message': 'Code expired, please re-register first then check your email'
+                'message': 'Code expired. Please check your email for a new verification.'
             }
-        else:
-            self.code_expiration = (now - timedelta(days=100))  # 3
-            self.save()
-            self.user_to_verify.is_active = True  # 4
-            self.user_to_verify.save()
+        self.code_expiration = (now - timedelta(days=100))  # 2
+        self.save()
+        self.user_to_verify.is_active = True  # 3
+        self.user_to_verify.save()  
+        return {
+            'verified': True,
+            'message': 'Code verified and the user is now active! You may now log in.'
+        }
 
-            return {
-                'verified': True,
-                'message': 'Code verified and the user is now active! You may now log in.'
-            }
 
     class Meta:
         ordering = ['-created_at']
@@ -166,16 +162,15 @@ class PasswordResetCode(BaseModel):
         '''
         --Send user password reset email--
         1) Send user a link to the frontend with a code that will let them post back to another url 
-           with updated passwords.
+           with updated passwords. 
         '''
         now = timezone.now()
-        user = self.user
         if not (self.code_expiration >= now):
-            return {
-                'password_reset_link_sent': False,
-                'message': 'Password reset link expired.'
-            }
-        subject = f'{user.username}, here is the link to reset your password.'
+            self.code_expiration = now + timedelta(days=3)
+            self.password_reset_code = str(uuid.uuid4().hex)
+            self.save()
+
+        subject = f'{self.user.username}, here is the link to reset your password.'
         template = 'email_templates/password_reset_link_email.txt'
         html_template = 'email_templates/password_reset_link_email.html'
         message_data = {
@@ -186,11 +181,30 @@ class PasswordResetCode(BaseModel):
         from_email = (
             'password-reset@' + settings.FRONTEND_URL.split('.')[-2] + '.com/'
         )
-        user.email_user(subject=subject, message=message, html_message=html_message, from_email=from_email)
-
+        self.user.email_user(subject=subject, message=message, html_message=html_message, from_email=from_email)
         return {
             'password_reset_link_sent': True,
             'message': 'Password reset link sent! Check your email.'
+        }
+
+    def verify(self, password):
+        '''
+        --Code verification--
+        1) If code is expired resend password reset email.
+        2) Call password_reset on user and return either True or False and a message.
+        '''
+        now = timezone.now()
+        if not (self.code_expiration >= now):
+            self.send_user_password_reset_email()  # 1
+            return {
+                'password_reset': False,
+                'message': 'Code expired. Please check your email for a new password reset link.'
+            }
+
+        password_reset = self.user.password_reset(password)
+        return {
+            'password_reset': password_reset['password_reset'],
+            'message': password_reset['message']
         }
 
     class Meta:

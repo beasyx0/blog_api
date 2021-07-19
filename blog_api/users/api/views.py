@@ -52,9 +52,10 @@ def user_register(request):
             user = User.objects.get(username=user_desired_username)  # one of them exists
 
         if not user.is_active:
+            user.verification_codes.last().send_user_verification_email()
             return Response({
                 'registered': False,
-                'message': 'An account for that user already exists and is inactive. Please try to resend verification email to reactivate.'
+                'message': 'An account for that user already exists and is inactive. Please check your email for a new verification.'
                 }, status=HTTP_400_BAD_REQUEST
             )
         else:
@@ -78,12 +79,12 @@ def user_register(request):
         new_registration.send(
             sender='new_registration_done', ip_address=user_ip_address, user_username=user_username, task_id=299
         )
-
         return Response({
                 'registered': True,
                 'message': 'User registered successfully, please check your email to verify.'
             }, status=HTTP_201_CREATED
         )
+
     return Response({
             'registered': False,
             'message': serializer.errors,
@@ -111,7 +112,9 @@ def user_verify(request):
                 'message': 'Please post a valid verification code to verify.'
             }, status=HTTP_400_BAD_REQUEST
         )
+
     try:
+
         verification_code_obj = VerificationCode.objects.get(verification_code=verification_code)  # 2
         verified = verification_code_obj.verify()  # 3
         if not verified['verified']:
@@ -125,6 +128,7 @@ def user_verify(request):
                 'message': verified['message'],
             }, status=HTTP_200_OK
         )
+
     except VerificationCode.DoesNotExist:
         return Response({
                 'verified': False,
@@ -144,8 +148,8 @@ def user_verify_resend(request):
     1) Checks for required email is in the request. If no email returns 400.
     2) Checks for required password in the request. If no password returns 400.
     2) Checks that user object exists with given email. If no user returns 400.
-    4) Checks that a verification exists code for given user. If no code then returns 400.
-    5) Calls send_user_verification_email. Returns the appropriate message and 200 if verifcation resent else 400.
+    4) Calls send_user_verification_email. Returns the appropriate message and 200 
+       if verifcation resent else 400.
     '''
     email = request.data.get('email', None)  # 1
     if not email:
@@ -164,6 +168,7 @@ def user_verify_resend(request):
         )
     
     try:
+
         user = User.objects.get(email=email)  # 3
         if not user.check_password(password):
             return Response({
@@ -171,31 +176,26 @@ def user_verify_resend(request):
                 'message': 'Password does not match what we have on file. Please try again.'
             }, status=HTTP_400_BAD_REQUEST)
 
-        now = timezone.now()
-        verification_code = user.verification_codes.last()  # 4
-        if not verification_code:
-            return Response({
-                    'verifification_sent': False,
-                    'message': 'No verification code found with provided email.'
-                }, status=HTTP_400_BAD_REQUEST
-            )
+        verification_code = user.verification_codes.last()
         
-        verification_code_sent = verification_code.send_user_verification_email()  # 5
+        verification_code_sent = verification_code.send_user_verification_email()  # 4
+
         if verification_code_sent['verification_sent']:
             return Response({
-                    'verifification_sent': True,
+                    'verifification_sent': verification_code_sent['verification_sent'],
                     'message': verification_code_sent['message'],
                 }, status=HTTP_200_OK
             )
         else:
             return Response({
-                    'verifification_sent': False,
+                    'verifification_sent': verification_code_sent['verification_sent'],
                     'message': verification_code_sent['message'],
                 }, status=HTTP_400_BAD_REQUEST
             )
+
     except User.DoesNotExist as e:
         return Response({
-                'verifification_sent': False,
+                'verifification_sent': verification_code_sent['verification_sent'],
                 'message': 'No user found with provided email.'
             }, status=HTTP_400_BAD_REQUEST
         )
@@ -239,7 +239,9 @@ def user_logout(request):
                 'message': 'Please post a valid refresh token to logout.'
             }, status=HTTP_400_BAD_REQUEST
         )
+    
     try:
+    
         token = RefreshToken(token_str)  # 2
         try:
             token.blacklist()  # 3
@@ -254,6 +256,7 @@ def user_logout(request):
                     'message': 'User is already logged out'
                 }, status=HTTP_400_BAD_REQUEST
             )
+
     except TokenError:
         return Response({
                 'logged_out': False,
@@ -280,16 +283,23 @@ def user_password_reset_send(request):
     email = request.data.get('email', None)  # 1
     if not email:
         return Response({
+                'password_reset_link_sent': False,
                 'message': 'Please post a valid email to get reset password link.'
             }, status=HTTP_400_BAD_REQUEST
         )
 
     try:
+
         user = User.objects.get(email=email)  # 2
 
         codes_exist = PasswordResetCode.objects.filter(user=user).exists()
         if codes_exist:
-            PasswordResetCode.objects.filter(user=user).delete()  # 3
+            password_reset_link_sent = PasswordResetCode.objects.filter(user=user).last().send_user_password_reset_email()
+            return Response({
+                    'password_reset_link_sent': password_reset_link_sent['password_reset_link_sent'],
+                    'message': password_reset_link_sent['message']
+                }, status=HTTP_200_OK
+            )
 
         code = PasswordResetCode.objects.create(user=user)  # 4
 
@@ -322,8 +332,7 @@ def user_password_reset(request):
     2) Checks that password and password 2 are included in the request. If no returns 400 and message.
     3) Checks that both new passwords match. If no returns 400 and message.
     4) Attempts to get the password code object. If no returns 400 and message.
-    5) Checks to ensure the password reset code is not expired. If so returns 200 and message.
-    6) Calls reset_password on the user object. Returns the appropriate status and message.
+    5) Calls verify on the PasswordCode object. Return either True or False and a message.
     '''
     password_reset_code = request.data.get('password_reset_code', None)  # 1
     if not password_reset_code:
@@ -350,30 +359,23 @@ def user_password_reset(request):
         )
 
     try:
+
         password_reset_code_object = PasswordResetCode.objects.get(password_reset_code=password_reset_code)  # 4
-        now = timezone.now()
-        if not password_reset_code_object.code_expiration >= now:  # 5
+
+        password_reset = password_reset_code_object.verify(password)  # 5
+
+        if not password_reset['password_reset']:
             return Response({
-                    'password_reset': False,
-                    'message': 'Password reset code is expired. Please post to password reset resend.'
+                    'password_reset': password_reset['password_reset'],
+                    'message': password_reset['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
-        user = password_reset_code_object.user
-
-        reset = user.password_reset(password)  # 6
-
-        if not reset['password_reset']:
+        else:
             return Response({
-                    'password_reset': reset['password_reset'],
-                    'message': reset['message']
-                }, status=HTTP_400_BAD_REQUEST
+                    'password_reset': password_reset['password_reset'],
+                    'message': password_reset['message']
+                }, status=HTTP_200_OK
             )
-
-        return Response({
-                'password_reset': reset['password_reset'],
-                'message': reset['message']
-            }, status=HTTP_200_OK
-        )
 
     except PasswordResetCode.DoesNotExist:
         return Response({
@@ -436,6 +438,7 @@ def user_delete(request):
                 'message': 'Please confirm that you want to delete user data.'
             }, status=HTTP_400_BAD_REQUEST
         )
+
     user = request.user
     token_str = request.data.get('refresh')  # 2
     if not token_str:
@@ -444,7 +447,9 @@ def user_delete(request):
                 'message': 'Please post a valid refresh token to delete.'
             }, status=HTTP_400_BAD_REQUEST
         )
+
     try:
+
         token = RefreshToken(token_str)  # 3
         try:
             token.blacklist()  # 4
@@ -454,12 +459,14 @@ def user_delete(request):
                     'message': 'Unable to blacklist token. Please check credentials.'
                 }, status=HTTP_400_BAD_REQUEST
             )
+
     except TokenError:
         return Response({
                 'deleted': False,
                 'message': 'No token found with given credentials.'
             }, status=HTTP_400_BAD_REQUEST
         )
+
     user.is_active = False  # 5
     user.save()
     return Response({
