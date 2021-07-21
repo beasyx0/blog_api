@@ -29,8 +29,8 @@ class UserTestsDelete(APITestCase):
         print('Testing user can delete (mark user inactive) and blacklists token')
         register_url = reverse('user-register')
         response = self.client.post(register_url, self.user_data, format='json')  # register, verify and login user
-        user = User.objects.last()
-        vcode = VerificationCode.objects.last()
+        user = User.objects.latest('created_at')
+        vcode = VerificationCode.objects.latest('created_at')
         vcode.verify()
         self.client.force_login(user=user)
 
@@ -65,8 +65,8 @@ class UserTestsDelete(APITestCase):
         print('Testing user cannot delete without confirming')
         register_url = reverse('user-register')
         response = self.client.post(register_url, self.user_data, format='json')  # register, login and verify user
-        user = User.objects.last()
-        vcode = VerificationCode.objects.last()
+        user = User.objects.latest('created_at')
+        vcode = VerificationCode.objects.latest('created_at')
         vcode.verify()
         self.client.force_login(user=user)
         delete_url = reverse('user-delete')
@@ -98,8 +98,8 @@ class UserTestsDelete(APITestCase):
         logout_url = reverse('user-logout')
 
         response = self.client.post(register_url, self.user_data, format='json')
-        user = User.objects.last()
-        vcode = VerificationCode.objects.last()
+        user = User.objects.latest('created_at')
+        vcode = VerificationCode.objects.latest('created_at')
         vcode.verify()
 
         login_data = {
@@ -110,8 +110,8 @@ class UserTestsDelete(APITestCase):
         login_response = self.client.post(login_url, login_data, format='json')
         self.assertEqual(login_response.status_code, HTTP_200_OK)
 
-        user = User.objects.last()
-        refresh = OutstandingToken.objects.last().token
+        user = User.objects.latest('created_at')
+        refresh = OutstandingToken.objects.latest('created_at').token
         
         logout_data = {
             'refresh': refresh

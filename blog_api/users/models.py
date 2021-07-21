@@ -1,7 +1,8 @@
 import uuid
 from datetime import timedelta
 from django.conf import settings
-from django.db import models
+from django.db.models import Model, DateTimeField, CharField, EmailField, BooleanField, \
+                                                        GenericIPAddressField, ForeignKey, CASCADE
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.urls import reverse
@@ -12,10 +13,10 @@ from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 
 
-class BaseModel(models.Model):
+class BaseModel(Model):
     '''Base model to subclass.'''
-    created_at = models.DateTimeField(editable=False, null=True)
-    updated_at = models.DateTimeField(editable=False, null=True)
+    created_at = DateTimeField(editable=False, null=True)
+    updated_at = DateTimeField(editable=False, null=True)
 
     class Meta:
         abstract = True
@@ -29,13 +30,13 @@ class BaseModel(models.Model):
 
 class User(BaseModel, AbstractUser):
     '''User model. New users are inactive until verified through email'''
-    pub_id = models.CharField(editable=False, unique=True, max_length=50)
-    name = models.CharField(blank=True, null=True, max_length=255)
-    email = models.EmailField(unique=True, blank=False, null=False, max_length=254)
+    pub_id = CharField(editable=False, unique=True, max_length=50)
+    name = CharField(blank=True, null=True, max_length=255)
+    email = EmailField(unique=True, blank=False, null=False, max_length=254)
     first_name = None
     last_name = None
-    is_active = models.BooleanField(default=False)
-    ip_address = models.GenericIPAddressField(editable=False, blank=True, null=True)
+    is_active = BooleanField(default=False)
+    ip_address = GenericIPAddressField(editable=False, blank=True, null=True)
 
     def password_reset(self, password):
         try:
@@ -61,7 +62,7 @@ class User(BaseModel, AbstractUser):
         }
 
     class Meta:
-        ordering = ['-created_at', 'is_active',]
+        ordering = ['-created_at',]
 
     def save(self, *args, **kwargs):
         '''
@@ -75,18 +76,23 @@ class User(BaseModel, AbstractUser):
 
 class VerificationCode(BaseModel):
     '''Verification Code model. Code is sent to user for verification, users are inactive until verified'''
-    verification_code = models.CharField(editable=False, unique=True, max_length=50)
-    user_to_verify = models.ForeignKey(User, related_name='verification_codes', on_delete=models.CASCADE)
-    code_expiration = models.DateTimeField(default=timezone.now() + timedelta(days=3))
+    verification_code = CharField(editable=False, unique=True, max_length=50)
+    user_to_verify = ForeignKey(User, related_name='verification_codes', on_delete=CASCADE)
+    code_expiration = DateTimeField(default=timezone.now() + timedelta(days=3))
 
     def send_user_verification_email(self):
 
         '''
         --Send user verification email--
-        Sends user a verification code email using user.email_user(), the link sent
-        points to settings.FRONTEND_URL. If code is expired then code is rotated and
+        Sends user a verification code email using user.email_user() if the user is not active, 
+        the link sent points to settings.FRONTEND_URL. If code is expired then code is rotated and
         expiration extended.
         '''
+        if self.user_to_verify.is_active:
+            return {
+                'verification_sent': False,
+                'message': 'The user is already verified and active. Please log in.'
+            }
         now = timezone.now()
         if not (self.code_expiration >= now):
             self.code_expiration = now + timedelta(days=3)
@@ -154,9 +160,9 @@ class PasswordResetCode(BaseModel):
     '''
     --Password reset code--
     '''
-    user = models.ForeignKey(User, related_name='password_reset_codes', on_delete=models.CASCADE)
-    password_reset_code = models.CharField(editable=False, unique=True, max_length=50)
-    code_expiration = models.DateTimeField(default=timezone.now() + timedelta(days=3))
+    user = ForeignKey(User, related_name='password_reset_codes', on_delete=CASCADE)
+    password_reset_code = CharField(editable=False, unique=True, max_length=50)
+    code_expiration = DateTimeField(default=timezone.now() + timedelta(days=3))
 
     def send_user_password_reset_email(self):
         '''

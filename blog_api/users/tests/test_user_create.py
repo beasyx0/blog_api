@@ -34,7 +34,6 @@ class UserTestsCreate(APITestCase):
             'password2': 'Testing4321@'
         }
         self.user4_no_name_data = {
-            'name': '',
             'username': 'someuser00',
             'email': 'someemail@email.com',
             'password': 'Testing4321@',
@@ -76,9 +75,9 @@ class UserTestsCreate(APITestCase):
         created and user ip recorded.
         """
         print('Testing registering new user')
-        url = reverse('user-register')
+        register_url = reverse('user-register')
         now = timezone.now()
-        response = self.client.post(url, self.user_data, format='json')
+        response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         self.assertEqual(response.data['message'], 'User registered successfully, please check your email to verify.')
@@ -107,8 +106,8 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response2.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
-            response2.data.get('message'), 
-            'An account for that user already exists and is inactive. Please check your email for a new verification.'
+            response2.data['message'], 
+            'A user with those credentials already exists and is inactive. Verification code sent! Check your email.'
         )
         
         verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}
@@ -119,7 +118,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response3.data['registered'], False)
         self.assertEqual(
             response3.data.get('message'), 
-            'An account for that user already exists and is active. Please try to login or reset password.'
+            'The user is already verified and active. Please log in.'
         )
         print('Done.....')
 
@@ -140,7 +139,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
             response2.data.get('message'), 
-            'An account for that user already exists and is inactive. Please check your email for a new verification.'
+            'A user with those credentials already exists and is inactive. Verification code sent! Check your email.'
         )
         
         verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}  # verify user
@@ -151,7 +150,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response3.data['registered'], False)
         self.assertEqual(
             response3.data.get('message'), 
-            'An account for that user already exists and is active. Please try to login or reset password.'  # email exist user active
+            'The user is already verified and active. Please log in.'
         )
         print('Done.....')
 
@@ -166,7 +165,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
             response2.data['message'], 
-            'An account for that user already exists and is inactive. Please check your email for a new verification.'
+            'A user with those credentials already exists and is inactive. Verification code sent! Check your email.'
         )
 
     def test_user_register_new_account_name_not_required(self):
@@ -181,7 +180,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         self.assertEqual(User.objects.count(), 1)
-        self.assertEqual(User.objects.get().name, 'someemail')  # default is email name
+        self.assertEqual(User.objects.get().name, self.user4_no_name_data['email'].split('@')[0])  # default is email name
         self.assertEqual(User.objects.last().is_active, False)
         self.assertEqual(User.objects.last().created_at.date(), now.date())
         self.assertEqual(User.objects.last().updated_at.date(), now.date())
@@ -247,6 +246,33 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(VerificationCode.objects.count(), 0)
         print('Done.....')
 
+    def test_user_register_new_account_fails_already_registered_and_active(self):
+        '''
+        Ensure that a user that is already registered and active cannot register and recieves a message and .
+        '''
+        print('Testing registering new user email already exists')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+        
+        verificaton_data = {'verification_code': VerificationCode.objects.latest('created_at').verification_code}
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        self.assertEqual(verification_response.data['verified'], True)
+        self.assertEqual(verification_response.data['message'], 'Code verified and the user is now active! You may now log in.')
+        
+        response2 = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response2.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response2.data['registered'], False)
+        self.assertEqual(
+            response2.data['message'], 
+            'The user is already verified and active. Please log in.'
+        )
+        print('Done.....')
+
     def test_user_verify(self):
         print('Testing new user can verify')
         register_url = reverse('user-register')
@@ -256,7 +282,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
@@ -300,6 +326,39 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(resend_response.status_code, HTTP_200_OK)
         self.assertEqual(resend_response.data['verifification_sent'], True)
         self.assertEqual(len(mail.outbox), 1)
+        
+        print('Done.....')
+
+    def test_user_resend_verification_email_fails_user_already_active(self):
+        '''
+        Ensure if an active user tries to resend the verification email it fails with a message.
+        '''
+        print('Testing cannot resend verification email user already active')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        verify_resend_url = reverse('user-verify-resend')
+        
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        self.assertEqual(verification_response.data['verified'], True)
+        self.assertEqual(verification_response.data['message'], 'Code verified and the user is now active! You may now log in.')
+
+        resend_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        resend_response = self.client.post(verify_resend_url, resend_data)
+        self.assertEqual(resend_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(resend_response.data['verifification_sent'], False)
+        self.assertEqual(resend_response.data['message'], 'The user is already verified and active. Please log in.')
+        self.assertEqual(len(mail.outbox), 0)
         
         print('Done.....')
 
@@ -368,7 +427,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(resend_response.data['message'], 'Verification code sent! Check your email.')
 
-        verification_code = VerificationCode.objects.last()
+        verification_code = VerificationCode.objects.latest('created_at')
         verification_code.code_expiration = verification_code.code_expiration - timedelta(days=30)
         verification_code.save()
 
@@ -394,7 +453,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
@@ -431,7 +490,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(resend_response.data['message'], 'Password reset link sent! Check your email.')
 
-        password_reset_code = PasswordResetCode.objects.last()
+        password_reset_code = PasswordResetCode.objects.latest('created_at')
         password_reset_code.code_expiration = password_reset_code.code_expiration - timedelta(days=30)
         password_reset_code.save()
 
@@ -455,7 +514,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
@@ -467,7 +526,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(password_reset_send_response.data['password_reset_link_sent'], True)
         self.assertEqual(password_reset_send_response.data['message'], 'Password reset link sent! Check your email.')
 
-        code = PasswordResetCode.objects.last()
+        code = PasswordResetCode.objects.latest('created_at')
         password_reset_data = {
             'password_reset_code': code.password_reset_code,
             'password': 'Newpass9@',
@@ -494,7 +553,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
@@ -519,7 +578,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
@@ -531,7 +590,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(password_reset_send_response.data['password_reset_link_sent'], True)
         self.assertEqual(password_reset_send_response.data['message'], 'Password reset link sent! Check your email.')
 
-        code = PasswordResetCode.objects.last()
+        code = PasswordResetCode.objects.latest('created_at')
         password_reset_data = {
             'password_reset_code': code.password_reset_code,
             'password': 'Testing2',
@@ -555,7 +614,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         verification_response = self.client.post(verification_url, verificaton_data, format='json')
         self.assertEqual(verification_response.status_code, HTTP_200_OK)
@@ -567,7 +626,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(password_reset_send_response.data['password_reset_link_sent'], True)
         self.assertEqual(password_reset_send_response.data['message'], 'Password reset link sent! Check your email.')
 
-        code = PasswordResetCode.objects.last()
+        code = PasswordResetCode.objects.latest('created_at')
         password_reset_data = {
             'password_reset_code': code.password_reset_code,
             'password': 'testingg',
@@ -592,7 +651,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         verificaton_data = {
-            'verification_code': VerificationCode.objects.last().verification_code
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
         }
         self.client.post(verification_url, verificaton_data, format='json')
         login_data = {
@@ -606,7 +665,6 @@ class UserTestsCreate(APITestCase):
     def test_user_cannot_login_not_verified(self):
         print('Testing new user cannot login not verified')
         register_url = reverse('user-register')
-        verification_url = reverse('user-verify-resend')
         login_url = reverse('user-login')
         response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(response.status_code, HTTP_201_CREATED)
@@ -619,3 +677,48 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(new_login.status_code, HTTP_401_UNAUTHORIZED)
         print('Done.....')
 
+    def test_user_cannot_login_wrong_email(self):
+        print('Testing new user cannot login wrong email')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        self.assertEqual(verification_response.data['verified'], True)
+
+        login_data = {
+            'email': 'kjl' + self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_401_UNAUTHORIZED)
+        print('Done.....')
+
+    def test_user_cannot_login_wrong_password(self):
+        print('Testing new user cannot login wrong password')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        self.assertEqual(verification_response.data['verified'], True)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': 'khkj'
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_401_UNAUTHORIZED)
+        print('Done.....')

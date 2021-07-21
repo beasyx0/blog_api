@@ -22,8 +22,8 @@ class UserTestsRead(APITestCase):
             'password2': 'Testing4321@'
         }
         response = self.client.post(register_url, data, format='json')
-        user = User.objects.last()
-        vcode = VerificationCode.objects.last()
+        user = User.objects.latest('created_at')
+        vcode = VerificationCode.objects.latest('created_at')
         vcode.verify()
         self.client.force_login(user=user)
         response = self.client.get(reverse("user"))

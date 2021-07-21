@@ -10,12 +10,11 @@ API_VERSION = 'api/v1/'
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
     path(f"{API_VERSION}users/", include('blog_api.users.urls')),
+    path(f"{API_VERSION}posts/", include('blog_api.posts.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
 if settings.DEBUG:
-    # This allows the error pages to be debugged during development, just visit
-    # these url in browser to see how these error pages look like.
     urlpatterns += [
         path(
             "400/",

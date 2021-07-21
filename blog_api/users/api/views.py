@@ -33,8 +33,8 @@ def user_register(request):
     :param: str password2 (required)
     :returns: str message.
     :returns: Response.HTTP_STATUS_CODE.
-    1) Checks if the desired email or username is already taken. If so returns 400 and appropriate 
-       message on wether existing user is active or not.
+    1) Checks if the desired email or username is already taken. If so returns 400, an appropriate 
+       message on wether existing user is active or not and in case inactive resends verification email.
     2) Checks if name in request is blank or none. If so adds email name as name.
     3) Attempts to serialize and save new user. Returns 201 for created 400 for errors.
     4) Record the users ip address for metrics.
@@ -44,27 +44,27 @@ def user_register(request):
     
     user_desired_username = request.data.get('username', None)
     username_exists = User.objects.filter(username=user_desired_username).exists()
-    
+
     if any([user_email_exists, username_exists]):
         try:
             user = User.objects.get(email=user_desired_email)
         except User.DoesNotExist:
             user = User.objects.get(username=user_desired_username)  # one of them exists
 
-        if not user.is_active:
-            user.verification_codes.last().send_user_verification_email()
+        verification = user.verification_codes.latest('created_at').send_user_verification_email()
+        if not verification['verification_sent']:
             return Response({
-                'registered': False,
-                'message': 'An account for that user already exists and is inactive. Please check your email for a new verification.'
+                    'registered': False,
+                    'message': verification['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
         else:
             return Response({
-                'registered': False,
-                'message': 'An account for that user already exists and is active. Please try to login or reset password.'
+                    'registered': False,
+                    'message': 'A user with those credentials already exists and is inactive. ' + verification['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
-    
+
     name = request.data.get('name', None)  # 2
     if not name or name == '':
         name = user_desired_email.split('@')[0]
@@ -176,8 +176,8 @@ def user_verify_resend(request):
                 'message': 'Password does not match what we have on file. Please try again.'
             }, status=HTTP_400_BAD_REQUEST)
 
-        verification_code = user.verification_codes.last()
-        
+        verification_code = user.verification_codes.latest('created_at')
+
         verification_code_sent = verification_code.send_user_verification_email()  # 4
 
         if verification_code_sent['verification_sent']:
@@ -195,7 +195,7 @@ def user_verify_resend(request):
 
     except User.DoesNotExist as e:
         return Response({
-                'verifification_sent': verification_code_sent['verification_sent'],
+                'verifification_sent': False,
                 'message': 'No user found with provided email.'
             }, status=HTTP_400_BAD_REQUEST
         )
@@ -294,7 +294,8 @@ def user_password_reset_send(request):
 
         codes_exist = PasswordResetCode.objects.filter(user=user).exists()
         if codes_exist:
-            password_reset_link_sent = PasswordResetCode.objects.filter(user=user).last().send_user_password_reset_email()
+            password_reset_link_sent = PasswordResetCode.objects.filter(
+                                            user=user).latest('created_at').send_user_password_reset_email()
             return Response({
                     'password_reset_link_sent': password_reset_link_sent['password_reset_link_sent'],
                     'message': password_reset_link_sent['message']

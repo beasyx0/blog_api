@@ -1,0 +1,26 @@
+USERS
+
+1) A user can register for a new account (secure password required)
+2) A user can't login until the users email has been verified
+3) A user can verify his email
+4) A user can resend the verification email if not recieved.
+5) A user can login and recieve a refresh and access token
+6) A user can refresh his token to stay logged in.
+7) A user can read his public user data while authenticated
+8) A user can update his public user data while authenticated
+9) A user can delete his user data and tokens     
+10) A user can request a password reset link and reset his password
+
+11) A user can view blog posts
+
+user model new field ideas:
+1) avatar url
+
+
+
+
+
+# new models
+# 1) posts
+# 2) bookmarks
+# 3) followers

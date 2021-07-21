@@ -61,12 +61,11 @@ class VerificationCodeAdmin(admin.ModelAdmin):
                     "verification_code", 
                     "user_to_verify", 
                     "code_expiration", 
-                    # "is_verified",
                 )
             }
         ),
     )
-    list_display = ["verification_code", "user_to_verify", "code_expiration",] # is_verified
+    list_display = ["verification_code", "user_to_verify", "code_expiration",]
     search_fields = []
     readonly_fields = ["verification_code","created_at", "updated_at",]
 
