@@ -46,9 +46,25 @@ class UserAdmin(auth_admin.UserAdmin):
             }
         ),
     )
-    list_display = ["username", "name", "email", "is_superuser", "is_staff", "ip_address", "is_active",]
+    list_display = ["pub_id", "username", "name", "email", "is_superuser", "ip_address", "is_active",]
     search_fields = ["name", "email",]
     readonly_fields = ["pub_id", "created_at", "updated_at", "ip_address",]
+    actions = ['users_set_active_inactive',]
+
+    def get_queryset(self, request):
+        qs = super(UserAdmin, self).get_queryset(request)
+        qs = qs.order_by('-created_at')
+        return qs
+
+    def users_set_active_inactive(self, request, queryset):
+        for user in queryset:
+            if not user.is_active:
+                user.is_active = True
+                user.save()
+            else:
+                user.is_active = False
+                user.save()
+        self.message_user(request, 'User(s) active status(\'s) changed.')
 
 
 @admin.register(VerificationCode)

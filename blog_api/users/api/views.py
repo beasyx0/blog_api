@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer
+from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer, UpdateUserSerializer
 from blog_api.users.models import VerificationCode, PasswordResetCode
 from blog_api.users.signals import new_registration
 from blog_api.users.utils import get_client_ip
@@ -27,6 +27,7 @@ from blog_api.users.utils import get_client_ip
 def user_register(request):
     '''
     --New user register view--
+    ==========================================================================================================
     :param: str username (required)
     :param: str email (required)
     :param: str password (required)
@@ -38,6 +39,7 @@ def user_register(request):
     2) Checks if name in request is blank or none. If so adds email name as name.
     3) Attempts to serialize and save new user. Returns 201 for created 400 for errors.
     4) Record the users ip address for metrics.
+    ==========================================================================================================
     '''
     user_desired_email = request.data.get('email', None)
     user_email_exists = User.objects.filter(email=user_desired_email).exists()  # 1
@@ -67,7 +69,11 @@ def user_register(request):
 
     name = request.data.get('name', None)  # 2
     if not name or name == '':
-        name = user_desired_email.split('@')[0]
+        if user_desired_email:
+            name = user_desired_email.split('@')[0]
+        else:
+            name = 'Awesome User'
+
         request.data['name'] = name
 
     serializer = RegisterSerializer(data=request.data)  # 3
@@ -97,12 +103,14 @@ def user_register(request):
 def user_verify(request):
     '''
     --User verification email view--
+    ==========================================================================================================
     :param: str verification code (required).
     :returns: str message.
     :returns: Response.HTTP_STATUS_CODE.
     1) Checks for required verification code in the request. If no code returns 400.
     2) Checks that a verification code object exists for code given. If no code then returns 400.
     3) Calls verify() on the verification code object. Returns 200 for veried == True else 400.
+    ==========================================================================================================
     '''
 
     verification_code = request.data.get('verification_code', None)  # 1
@@ -142,6 +150,7 @@ def user_verify(request):
 def user_verify_resend(request):
     '''
     --Resend verification email view--
+    ==========================================================================================================
     :params: str email (required)
     :returns: str message.
     :returns: Response.HTTP_STATUS_CODE.
@@ -150,6 +159,7 @@ def user_verify_resend(request):
     2) Checks that user object exists with given email. If no user returns 400.
     4) Calls send_user_verification_email. Returns the appropriate message and 200 
        if verifcation resent else 400.
+    ==========================================================================================================
     '''
     email = request.data.get('email', None)  # 1
     if not email:
@@ -207,11 +217,13 @@ user_login_refresh = TokenRefreshView().as_view()
 class MyObtainTokenPairView(TokenObtainPairView):  # 1
     '''
     --User obtain token view (Login) djangorestframework-simplejwt--
+    ==========================================================================================================
     :param: str settings.SIMPLE_JWT_LOGIN_USERNAME_FIELD ('e.g. `email` or `username`') (required)
     :param: str password (required)
     :returns: Response.HTTP_STATUS_CODE. 
     :returns: Token, RefreshToken.
     1) Attmpts to obtain a token pair with email & password. Returns 200 else 400.
+    ==========================================================================================================
     '''
     permission_classes = (AllowAny,)
     serializer_class = TokenObtainPairSerializer
@@ -224,13 +236,14 @@ user_login = MyObtainTokenPairView().as_view()
 def user_logout(request):
     '''
     --Logout user view--
+    ==========================================================================================================
     :param: str refresh token (required).
     :returns: str message.
     :returns: Response.HTTP_STATUS_CODE.
     1) Checks that refresh token in request. If no token returns 400.
     2) Checks that a refresh object exists. If no returns 400.
     3) Attempts to blacklist (logout) the refresh token. Returns 204 else 400.
-    Todo: Tests for logout!
+    ==========================================================================================================
     '''
     token_str = request.data.get('refresh', None)  # 1
     if not token_str:
@@ -270,15 +283,17 @@ def user_logout(request):
 def user_password_reset_send(request):
     '''
     --Send password reset link view--
+    ==========================================================================================================
     :param: str email (required).
     :returns: str message.
     :returns: Response.HTTP_STATUS_CODE.
     1) Checks for email in request. If no returns 400 and messsage.
     2) Checks that user object exists. If no returns 400 and message.
-    3) Checks if any PasswordResetCode objects exist for user. If so 
-       deletes it.
+    3) Checks if any PasswordResetCode objects exist for user. If so resends it 
+       and returns 200 and message.
     4) Attempts to create a new PasswordResetCode object for the user.
        If success returns 200 and message else 400 and messsage.
+    ==========================================================================================================
     '''
     email = request.data.get('email', None)  # 1
     if not email:
@@ -295,7 +310,7 @@ def user_password_reset_send(request):
         codes_exist = PasswordResetCode.objects.filter(user=user).exists()
         if codes_exist:
             password_reset_link_sent = PasswordResetCode.objects.filter(
-                                            user=user).latest('created_at').send_user_password_reset_email()
+                                            user=user).latest('created_at').send_user_password_reset_email()  # 3
             return Response({
                     'password_reset_link_sent': password_reset_link_sent['password_reset_link_sent'],
                     'message': password_reset_link_sent['message']
@@ -324,6 +339,7 @@ def user_password_reset_send(request):
 def user_password_reset(request):
     '''
     --Password reset view--
+    ==========================================================================================================
     :param: str password_reset_code (required).
     :param: str password (required),
     :param: str password2 (required).
@@ -334,6 +350,7 @@ def user_password_reset(request):
     3) Checks that both new passwords match. If no returns 400 and message.
     4) Attempts to get the password code object. If no returns 400 and message.
     5) Calls verify on the PasswordCode object. Return either True or False and a message.
+    ==========================================================================================================
     '''
     password_reset_code = request.data.get('password_reset_code', None)  # 1
     if not password_reset_code:
@@ -386,37 +403,55 @@ def user_password_reset(request):
         )
 
 
-@api_view(['POST'])
+@api_view(['PUT'])
 @permission_classes((IsAuthenticated,))
 def user_update(request):
     """
     --Update a User instance--
+    ==========================================================================================================
     :param: str partial.
     :returns: str message
-    1) Checks for 'partial' keyword arg in request. Defaults to false.
-    2) Serializes request user.
-    3) Attempts to save the user serializer. If errors returns 400 and errors.
-    4) Saves serializer instance and returns 200 and user.
+    1) Checks for partial keyword in request. This may be needed in the future once we add more fields to user.
+    2) Checks for email in request. You can not do that.
+    3) Verifies that there is at least one field to be updated included in the request.
+    4) Serializes request user.
+    5) Attempts to save the user serializer. If errors returns 400 and errors.
+    6) Saves serializer instance and returns 200 and user.
+    ==========================================================================================================
     """
     partial = request.data.get('partial', False)  # 1
-    user = request.user
-    serializer = UserSerializer(user, data=request.data, partial=partial)  # 2
-    try:
-        serializer.is_valid(raise_exception=True)  # 3
-    except:
-        return Response({
-            'updated': False,
-            'message': serializer.errors
-        }, status=HTTP_400_BAD_REQUEST
-    )
-    serializer.save()  # 4
 
-    return Response({
-            'updated': True,
-            'message': 'User updated successfully.',
-            'user': serializer.data
-        }, status=HTTP_200_OK
-    )
+    email = request.data.get('email', None)  # 2
+    if email:
+        return Response({
+                'updated': False,
+                'message': 'You cannot update your email.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    if not request.data.keys():  # 3
+        return Response({
+                'updated': False,
+                'message': 'You need to include at least one field to update.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+    user = request.user
+    serializer = UpdateUserSerializer(user, data=request.data, partial=partial)  # 4
+
+    if serializer.is_valid():  # 5
+        serializer.save()  # 6
+        return Response({
+                'updated': True,
+                'message': 'User updated successfully.',
+                'user': serializer.data
+            }, status=HTTP_200_OK
+        )
+    else:
+        return Response({
+                'updated': False,
+                'message': serializer.errors
+            }, status=HTTP_400_BAD_REQUEST
+        )
 
 
 @api_view(['POST'])
@@ -424,6 +459,7 @@ def user_update(request):
 def user_delete(request):
     """
     --Delete a User instance (make inactive)--
+    ==========================================================================================================
     1) Checks wether this delete is confirmed. If False returns 400.
     2) Checks to make sure there is a refresh token string in the request.
        If no returns 400.
@@ -431,6 +467,7 @@ def user_delete(request):
        returns 400.
     4) Attempts to blacklist the users refresh token. If no returns 400.
     5) Changes the user is_active to False (delete user). Returns 204.
+    ==========================================================================================================
     """
     delete_confirmed = request.data.get('delete_confirmed', False)  # 1
     if not delete_confirmed:
@@ -441,7 +478,7 @@ def user_delete(request):
         )
 
     user = request.user
-    token_str = request.data.get('refresh')  # 2
+    token_str = request.data.get('refresh', None)  # 2
     if not token_str:
         return Response({
                 'deleted': False,
@@ -482,10 +519,12 @@ def user_delete(request):
 def user(request):
     '''
     --User detail view--
+    ==========================================================================================================
     :param: request.user
     :returns: User serialized.
     :returns: Response.HTTP_STATUS_CODE.
     1) Grabs the user from request. Returns 200.
+    ==========================================================================================================
     '''
     user = request.user
     serialized_user = UserSerializer(user).data

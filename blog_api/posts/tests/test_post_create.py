@@ -63,6 +63,7 @@ class PostTestsCreate(APITestCase):
         
         create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
         self.assertEqual(Post.objects.all().count(), 1)
         self.assertEqual(Post.objects.all()[0].title, 'A really cool title for some really cool blog post by a really cool developer.')
 
@@ -96,3 +97,30 @@ class PostTestsCreate(APITestCase):
         
         create_post_response = self.client.post(create_post_url, self.blog_post_data_no_content, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(create_post_response.data['created'], False)
+
+    def test_user_cannot_create_post_no_title(self):
+        print('Testing authenticated user can create new post')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        self.assertEqual(verification_response.data['verified'], True)
+
+        user = User.objects.latest('created_at')
+        self.client.force_login(user=user)
+        
+        create_post_response = self.client.post(create_post_url, self.blog_post_data_no_title_, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(create_post_response.data['created'], False)
+

@@ -9,6 +9,9 @@ from rest_framework_simplejwt.serializers import PasswordField
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.validators import UnicodeUsernameValidator
+
+from blog_api.users.model_validators import validate_username_max_3_special_chars, validate_name_no_special_chars
 
 User = get_user_model()
 
@@ -122,8 +125,21 @@ class RegisterSerializer(ModelSerializer):
     '''
     --Register Serializer--
     '''
-    username = CharField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
-    name = CharField(required=False, default='')
+    username = CharField(
+        required=True, 
+        validators=[
+            validate_username_max_3_special_chars,
+            UnicodeUsernameValidator(), 
+            UniqueValidator(queryset=User.objects.all())
+        ]
+    )
+    name = CharField(
+        allow_blank=True, 
+        allow_null=True, 
+        max_length=255, 
+        required=False, 
+        validators=[validate_name_no_special_chars]
+    )
     email = EmailField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
     password = CharField(write_only=True, required=True, validators=[validate_password])
     password2 = CharField(write_only=True, required=True)
@@ -166,3 +182,25 @@ class UserSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ('pub_id', 'username', 'name', 'email',)
+
+
+class UpdateUserSerializer(ModelSerializer):
+
+    username = CharField(
+        required=False, 
+        validators=[
+            validate_username_max_3_special_chars,
+            UnicodeUsernameValidator(), 
+            UniqueValidator(queryset=User.objects.all())
+        ]
+    )
+    name = CharField(
+        allow_blank=True, 
+        allow_null=True, 
+        max_length=255, 
+        required=False, 
+        validators=[validate_name_no_special_chars])
+    
+    class Meta:
+        model = User
+        fields = ('username', 'name',)

@@ -90,7 +90,26 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(VerificationCode.objects.count(), 1)
         print('Done.....')
 
-    def test_user_register_new_account_email_already_exists(self):
+    def test_user_register_new_account_name_not_required(self):
+        """
+        Ensure we can create a new user without providing a name and that the name is set to email name,
+        the user is_active == False, the BaseModel saved correctly and that a new VerificationCode is created and emailed.
+        """
+        print('Testing registering new user without name')
+        register_url = reverse('user-register')
+        now = timezone.now()
+        response = self.client.post(register_url, self.user4_no_name_data, format='json')
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.data['registered'], True)
+        self.assertEqual(User.objects.count(), 1)
+        self.assertEqual(User.objects.get().name, self.user4_no_name_data['email'].split('@')[0])  # default is email name
+        self.assertEqual(User.objects.last().is_active, False)
+        self.assertEqual(User.objects.last().created_at.date(), now.date())
+        self.assertEqual(User.objects.last().updated_at.date(), now.date())
+        self.assertEqual(VerificationCode.objects.count(), 1)
+        print('Done.....')
+
+    def test_user_register_new_account_fails_email_already_exists(self):
         """
         Ensure that we return the appropriate message if a user tries to register when already having account.
         """
@@ -122,7 +141,7 @@ class UserTestsCreate(APITestCase):
         )
         print('Done.....')
 
-    def test_user_register_new_account_username_already_exists(self):
+    def test_user_register_new_account_fails_username_already_exists(self):
         """
         Ensure that we return the appropriate message if a user tries to register when already having account.
         """
@@ -154,7 +173,7 @@ class UserTestsCreate(APITestCase):
         )
         print('Done.....')
 
-    def test_user_register_new_account_while_already_registered_account_is_inactive(self):
+    def test_user_register_new_account_fails_while_already_registered_account_is_inactive(self):
         print('Testing registering new user while already registered and account is inactive')
         register_url = reverse('user-register')
         response = self.client.post(register_url, self.user_data, format='json')
@@ -167,25 +186,6 @@ class UserTestsCreate(APITestCase):
             response2.data['message'], 
             'A user with those credentials already exists and is inactive. Verification code sent! Check your email.'
         )
-
-    def test_user_register_new_account_name_not_required(self):
-        """
-        Ensure we can create a new user without providing a name and that the name is set to email name,
-        the user is_active == False, the BaseModel saved correctly and that a new VerificationCode is created and emailed.
-        """
-        print('Testing registering new user without name')
-        register_url = reverse('user-register')
-        now = timezone.now()
-        response = self.client.post(register_url, self.user4_no_name_data, format='json')
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
-        self.assertEqual(response.data['registered'], True)
-        self.assertEqual(User.objects.count(), 1)
-        self.assertEqual(User.objects.get().name, self.user4_no_name_data['email'].split('@')[0])  # default is email name
-        self.assertEqual(User.objects.last().is_active, False)
-        self.assertEqual(User.objects.last().created_at.date(), now.date())
-        self.assertEqual(User.objects.last().updated_at.date(), now.date())
-        self.assertEqual(VerificationCode.objects.count(), 1)
-        print('Done.....')
 
     def test_user_register_new_account_fails_with_no_username(self):
         """
@@ -271,6 +271,54 @@ class UserTestsCreate(APITestCase):
             response2.data['message'], 
             'The user is already verified and active. Please log in.'
         )
+        print('Done.....')
+
+    def test_user_register_new_account_fails_username_more_than_3_special_chars(self):
+        """
+        Ensure that we return the appropriate message if a user tries to register with more than 3 special chars in username.
+        """
+        print('Testing registering new user fails with more than 3 special characters in username')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+
+        self.user_data['username'] = 'billy@@@@'
+
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['registered'], False)
+
+        print('Done.....')
+
+    def test_user_register_new_account_fails_name_with_special_chars(self):
+        """
+        Ensure that we return the appropriate message if a user tries to register with special characters in name.
+        """
+        print('Testing registering new user fails with special characters in name')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+
+        self.user_data['name'] = 'billy@@@@'
+
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['registered'], False)
+
+        print('Done.....')
+
+    def test_user_register_new_account_fails_username_with_spaces(self):
+        """
+        Ensure that we return the appropriate message if a user tries to register with spaces in username.
+        """
+        print('Testing registering new user fails with spaces in username')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+
+        self.user_data['username'] = 'bill y@@'
+
+        response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['registered'], False)
+
         print('Done.....')
 
     def test_user_verify(self):

@@ -1,4 +1,4 @@
-from rest_framework.serializers import ModelSerializer, ValidationError
+from rest_framework.serializers import ModelSerializer, ValidationError, PrimaryKeyRelatedField
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -27,9 +27,21 @@ class NextPostPreviousPostSerializer(ModelSerializer):
 
 class PostSerializer(ModelSerializer):
 
+    author = PrimaryKeyRelatedField(allow_null=True, queryset=User.objects.all(), required=False)
+
+    nextpost = PrimaryKeyRelatedField(  # prefetch related and select related for faster lookups
+    allow_null=True, 
+    queryset=Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost'), 
+    required=False
+    )
+    previouspost = PrimaryKeyRelatedField(
+        allow_null=True, 
+        queryset=Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost'), 
+        required=False
+    )
+
     class Meta:
         model = Post
-        # depth = 5
         fields = [
             'slug', 'title', 'author', 'featured',
             'estimated_reading_time', 'content', 
@@ -61,3 +73,18 @@ class PostSerializer(ModelSerializer):
             previouspost=validated_data.get('previouspost', None),
         )
         return post
+
+
+class UpdatePostSerializer(ModelSerializer):
+
+    class Meta:
+        model = Post
+        fields = ['content', 'featured', 'nextpost', 'previouspost',]
+
+    def to_representation(self, instance):
+        '''
+        Nested serializers.
+        '''
+        self.fields['nextpost'] = NextPostPreviousPostSerializer()
+        self.fields['previouspost'] = NextPostPreviousPostSerializer() 
+        return super(UpdatePostSerializer, self).to_representation(instance)

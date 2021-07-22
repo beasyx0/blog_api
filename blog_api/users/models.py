@@ -11,6 +11,10 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
+from django.contrib.auth.validators import UnicodeUsernameValidator
+
+from blog_api.users.model_validators import validate_username_min_3_letters, validate_username_max_3_special_chars, \
+                                                                                            validate_name_no_special_chars
 
 
 class BaseModel(Model):
@@ -31,7 +35,13 @@ class BaseModel(Model):
 class User(BaseModel, AbstractUser):
     '''User model. New users are inactive until verified through email'''
     pub_id = CharField(editable=False, unique=True, max_length=50)
-    name = CharField(blank=True, null=True, max_length=255)
+    username = CharField(
+        max_length=150, unique=True, 
+        validators=[
+            UnicodeUsernameValidator, validate_username_min_3_letters, validate_username_max_3_special_chars
+        ]
+    )
+    name = CharField(blank=True, null=True, max_length=255, validators=[validate_name_no_special_chars])
     email = EmailField(unique=True, blank=False, null=False, max_length=254)
     first_name = None
     last_name = None
