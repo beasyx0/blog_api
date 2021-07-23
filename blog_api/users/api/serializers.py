@@ -182,42 +182,25 @@ class RegisterSerializer(ModelSerializer):
         return user  # 3
 
 
-class UserFollowingSerializer(ModelSerializer):
-
-    class Meta: 
-        model = UserFollowing
-        fields = ['following',]
-
-
-class UserFollowersSerializer(ModelSerializer):
-
-    class Meta:
-        model = UserFollowing
-        fields = ['user',]
-
-
-class UserPostSerializer(ModelSerializer):
-    class Meta:
-        model = Post
-        fields = ['slug', 'title',]
-
-
 class UserSerializer(ModelSerializer):
-
-    following = SerializerMethodField()
-    followers = SerializerMethodField()
     posts = SerializerMethodField()
+    following = SerializerMethodField()
+    following_posts = SerializerMethodField()
+    followers = SerializerMethodField()
     bookmarks = SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['pub_id', 'username', 'name', 'email', 'followers', 'following', 'posts', 'bookmarks',]
+        fields = ['pub_id', 'username', 'name', 'email', 'posts', 'following', 'following_posts', 'followers', 'bookmarks',]
 
     def get_posts(self, obj):
         return obj.get_posts()
 
     def get_following(self, obj):
         return obj.get_following()
+
+    def get_following_posts(self, obj):
+        return obj.get_following_posts()
 
     def get_followers(self, obj):
         return obj.get_followers()

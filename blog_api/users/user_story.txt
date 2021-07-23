@@ -10,8 +10,7 @@
 8) A user can update his public user data while authenticated
 9) A user can delete his user data and tokens     
 10) A user can request a password reset link and reset his password
-11) A user can request to change his email
-12) A user can follow other users
+11) A user can follow other users
 
 user model new field ideas:
 1) avatar url
@@ -20,23 +19,21 @@ user model new field ideas:
 
 # POSTS
 
-1) A user can view all blog posts
-2) A user can create new blog posts
-3) A user can edit his own posts
+1) A user can view all blog posts *
+2) A user can create new blog posts *
+3) A user can edit his own posts *
 4) A user can delete his own posts
 5) A user can search for posts
-6) A user can bookmark posts
+6) A user can bookmark posts *
 7) A user can like/dislike posts
-8) A user can view all his own blog posts
-9) A user can view all posts by those hes following
-# blog posts
+8) A user can view all posts by those hes following *
+
 # tags
-# bookmarks
 # likes
 # views
 # comments
 
-# new models
-1) posts
-2) bookmarks
-3) followers
+Todo:
+add bookmarked posts to user admin
+add followers/following to user admin
+fallback url

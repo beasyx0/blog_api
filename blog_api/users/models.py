@@ -104,6 +104,18 @@ class User(BaseModel, AbstractUser):
             following.append({'pub_id': follow.following.pub_id, 'username': follow.following.username})
         return following
 
+    def get_following_posts(self):
+        '''
+        Get all posts of those the user is following.
+        '''
+        from blog_api.posts.models import Post
+        following_posts = []
+        for follow in self.following.all():
+            posts = Post.objects.filter(author=follow.following)
+            for post in posts:
+                following_posts.append({'slug': post.slug, 'title': post.title})
+        return following_posts
+
     def get_followers(self):
         '''
         Return a dictionary of the users followers.
@@ -111,7 +123,7 @@ class User(BaseModel, AbstractUser):
         self_followerss = self.followers.all()
         followers= []
         for follow in self_followerss:
-            followers.append({'pub_id': follow.following.pub_id, 'username': follow.following.username})
+            followers.append({'pub_id': follow.user.pub_id, 'username': follow.user.username})
         return followers
 
     def get_posts(self):
@@ -125,11 +137,20 @@ class User(BaseModel, AbstractUser):
             posts.append({'slug': post.slug, 'title': post.title})
         return posts
 
-    def bookmark_post(self):
+    def bookmark_post(self, slug):
         '''
-        Implement this!
+        Bookmarks a post for this user.
         '''
-        pass
+        from blog_api.posts.models import Post
+        try:
+            post_to_bookmark = Post.objects.get(slug=slug)
+        except Post.DoesNotExist:
+            return {
+                'bookmarked': False,
+                'message': 'No post found with provided slug.'
+            }
+        bookmarked = post_to_bookmark.bookmark(pubid=self.pub_id)
+        return bookmarked
 
     def get_self_bookmarks(self):
         '''
@@ -310,7 +331,6 @@ class PasswordResetCode(BaseModel):
         return super(PasswordResetCode, self).save(*args, **kwargs)
 
 
-
 class UserFollowing(BaseModel):
 
     user = ForeignKey(User, related_name='following', on_delete=CASCADE, to_field='pub_id')
@@ -331,14 +351,14 @@ class UserFollowing(BaseModel):
     def __str__(self):
         return f'{self.user.username} follows {self.following}'
 
-    def get_self_user_pub_id(self):
-        return self.user.pub_id
+    # def get_self_user_pub_id(self):
+    #     return self.user.pub_id
 
-    def get_self_user_username(self):
-        return self.user.username
+    # def get_self_user_username(self):
+    #     return self.user.username
 
-    def get_self_following_pub_id(self):
-        return self.following.pub_id
+    # def get_self_following_pub_id(self):
+    #     return self.following.pub_id
 
-    def get_self_following_username(self):
-        return self.following.username
+    # def get_self_following_username(self):
+    #     return self.following.username

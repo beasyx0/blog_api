@@ -77,6 +77,39 @@ class Post(BaseModel):
             _get_unique_slug(self)
         return unique_slug
 
+    def bookmark(self, pubid):
+        '''
+        Bookmarks this post with provided user.
+        '''
+        try:
+            user = User.objects.get(pub_id=pubid)
+        except User.DoesNotExist:
+            return {
+                'bookmarked': False,
+                'message': 'No user found with provided id.'
+            }
+
+        if self.author == user:
+            return {
+                'bookmarked': False,
+                'message': 'You can not bookmark your own post.'
+            }
+
+        if not user in self.bookmarks.all():
+            self.bookmarks.add(user)
+            self.save()
+            return {
+                'bookmarked': True,
+                'message': f'Post {self.slug} bookmarked successfully.'
+            }
+        else:
+            self.bookmarks.remove(user)
+            self.save()
+            return {
+                'bookmarked': False,
+                'message': f'Post {self.slug} un-bookmarked successfully.'
+            }
+
     def save(self, *args, **kwargs):
         if not self.id:
             self.slug = self._get_unique_slug()

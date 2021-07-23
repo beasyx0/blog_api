@@ -7,13 +7,33 @@ User = get_user_model()
 
 from blog_api.posts.models import Post
 
-# @admin.register(Post)
-# class PostAdmin(admin.ModelAdmin):
-#     fieldsets = (
-#         (_("General"), {"fields": ("user", "many",)}),
-#     )
-#     list_display = ["user",]
-#     # search_fields = ["name", "email",]
-#     # readonly_fields = ["pub_id", "created_at", "updated_at", "ip_address",]
 
-admin.site.register(Post)
+@admin.register(Post)
+class PostAdmin(admin.ModelAdmin):
+    date_hierarchy = 'created_at'
+    list_display = ('slug', 'created_at', 'updated_at', 'title', 'author', 'estimated_reading_time', 'featured', 'is_active',)
+    list_filter = ('created_at', 'author', 'featured', 'is_active',)
+    list_display_links = ('slug',)
+    list_editable = ('title', 'author', 'featured', 'is_active',)
+    list_per_page = 50
+    list_select_related = True
+    search_fields = ['title', 'author', 'content',]
+    fieldsets = (
+            (None, {
+                'fields': (
+                    'created_at', 'updated_at', 'slug', 
+                    'title', 'author', 'content', 
+                    'bookmarks', 'previouspost', 'nextpost', 
+                    'estimated_reading_time', 
+                    'featured', 'is_active',
+                ),
+                'classes': ('wide', 'extrapretty'),
+            }),
+        )
+    filter_horizontal = ['bookmarks',]
+    readonly_fields = ('created_at', 'updated_at', 'slug',)
+
+    def get_queryset(self, request):
+        qs = super(PostAdmin, self).get_queryset(request)
+        qs = qs.defer('content').prefetch_related('bookmarks').select_related('author').select_related('nextpost').select_related('previouspost')
+        return qs

@@ -541,31 +541,42 @@ def user_follow(request):
     ==========================================================================================================
     :param: follow_pub_id str (required)
     1) Checks for follow_pub_id in request. If not returns 400 and message.
-    2) Gets the current user.
-    3) Calls follow_user on user model. Returns 200 or 400 and appropriate message.
+    2) Attempts to lookup a user with the param follow_pub_id. If no returns 400 and message.
+    3) Gets the current user.
+    4) Calls follow_user on user model. Returns 200 or 400 and appropriate message.
     :returns: boolean followed.
     :returns: str message.
     :returns: Response.HTTP_STATUS_CODE.
     ==========================================================================================================
     '''
-    follow_pub_id = request.data.get('follow_pub_id', None)
+    follow_pub_id = request.data.get('follow_pub_id', None)  # 1
     if not follow_pub_id:
         return Response({
             'followed': False,
             'message': 'Please post a valid id of a user to follow.'
         },status=HTTP_400_BAD_REQUEST)
 
-    user = request.user
+    try:
+        user_to_follow = User.objects.get(pub_id=follow_pub_id)  # 2
+    except User.DoesNotExist:
+        return Response({
+                'followed': False,
+                'message': 'No user found with provided pub id.'
+            }, status=HTTP_400_BAD_REQUEST)
 
-    followed = user.follow_user(follow_pub_id)
+    user = request.user  # 3
+
+    followed = user.follow_user(follow_pub_id)  # 4
 
     if followed['followed']:
         return Response({
             'followed': True,
             'message': followed['message']
-        }, status=HTTP_201_CREATED)
+        }, status=HTTP_201_CREATED
+    )
     else:
         return Response({
             'followed': False,
             'message': followed['message']
-        }, status=HTTP_200_OK)
+        }, status=HTTP_200_OK
+    )

@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from blog_api.posts.models import Post
 from blog_api.posts.api.serializers import PostSerializer, UpdatePostSerializer 
@@ -18,18 +19,20 @@ def posts(request):
     '''
     --All posts view--
     ==========================================================================================================
-    Returns nested representations of all posts.
+    Returns nested representations of all posts. Paginates the quereyset.
     ==========================================================================================================
     '''
-    posts = Post.objects.prefetch_related('bookmarks')      \
-                        .select_related('previouspost')     \
-                        .select_related('nextpost')         \
-                        .filter(is_active=True)
+    posts_to_paginate = Post.objects.prefetch_related('bookmarks')      \
+                                    .select_related('previouspost')     \
+                                    .select_related('nextpost')         \
+                                    .filter(is_active=True)
+
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(posts, request)
+    serializer = PostSerializer(page, many=True, context={'request': request})
+    all_posts = paginator.get_paginated_response(serializer.data)
     
-    serialized_posts = PostSerializer(posts, many=True).data
-    return Response({
-        'posts': serialized_posts
-    }, status=HTTP_200_OK)
+    return all_posts
 
 
 @api_view(['POST'])
@@ -178,5 +181,55 @@ def post_update(request):
         )
 
 
-# @api_view(['POST'])
-# @permission_classes(())
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+def post_bookmark(request):
+    '''
+    --Post Bookmark view--
+    ==========================================================================================================
+    :param: slug post_to_bookmark (required)
+    1) Attempts to get the post_to_bookmark slug from request. If no returns 400 and message.
+    2) Attempts to get the post to bookmark with the post_to_bookmark slug. If no returns 400 and message.
+    2) Gets the current user and calls user.bookmark post(). Returns 201 for bookmarked, 200 for un-bookmarked
+       or 400 if attempting to bookmark own post.
+    ==========================================================================================================
+    '''
+    post_to_bookmark = request.data.get('post_to_bookmark', None)  # 1
+    if not post_to_bookmark:
+        return Response({
+                'bookmarked': False,
+                'message': 'Please post a valid post slug to bookmark.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        Post.objects.get(slug=post_to_bookmark)  # 2
+    except Post.DoesNotExist:
+        return Response({
+                'bookmarked': False,
+                'message': 'No post found with provided slug.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    user = request.user
+    bookmarked = user.bookmark_post(post_to_bookmark)  # 3
+
+    if bookmarked['bookmarked']:
+        return Response({
+            'bookmarked': True,
+            'message': bookmarked['message']
+        }, status=HTTP_201_CREATED
+    )
+    else:
+        if bookmarked['message'] == 'You can not bookmark your own post.':
+            return Response({
+                    'bookmarked': False,
+                    'message': bookmarked['message']
+                }, status=HTTP_400_BAD_REQUEST
+            )
+        else:
+            return Response({
+                    'bookmarked': False,
+                    'message': bookmarked['message']
+                }, status=HTTP_200_OK
+            )
