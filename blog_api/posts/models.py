@@ -36,13 +36,14 @@ class Post(BaseModel):
     '''
     slug = SlugField(editable=False, max_length=255, unique=True)
     title = CharField(max_length=255, blank=False, null=False)
-    author = ForeignKey(User, on_delete=SET_NULL, null=True)
+    author = ForeignKey(User, on_delete=SET_NULL, null=True, related_name='posts')
     featured = BooleanField(default=False)
     estimated_reading_time = IntegerField(default=0)
     content = TextField(blank=False, null=False)
     bookmarks = ManyToManyField(User, related_name='bookmarked_posts', blank=True)
     previouspost = ForeignKey('self', related_name='previous_post', on_delete=SET_NULL, blank=True, null=True)
     nextpost = ForeignKey('self', related_name='next_post', on_delete=SET_NULL, blank=True, null=True)
+    is_active = BooleanField(default=True)
     search_vector = SearchVectorField(editable=False, null=True)
 
     objects = Manager()

@@ -149,11 +149,11 @@ class UserTestsCreate(APITestCase):
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
 
-        response = self.client.post(register_url, self.user_data, format='json')  # register new user
+        response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         self.assertEqual(response.data['registered'], True)
         
-        response2 = self.client.post(register_url, self.user2_dif_email_data, format='json')  # attempt to register same user again different email same username
+        response2 = self.client.post(register_url, self.user2_dif_email_data, format='json')
         self.assertEqual(response2.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
@@ -161,10 +161,10 @@ class UserTestsCreate(APITestCase):
             'A user with those credentials already exists and is inactive. Verification code sent! Check your email.'
         )
         
-        verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}  # verify user
+        verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}
         self.client.post(verification_url, verificaton_data, format='json')
         
-        response3 = self.client.post(register_url, self.user_data, format='json')  # attempt to register same user again after verified
+        response3 = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(response3.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(response3.data['registered'], False)
         self.assertEqual(

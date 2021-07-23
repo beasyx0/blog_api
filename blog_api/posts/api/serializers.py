@@ -3,7 +3,6 @@ from rest_framework.serializers import ModelSerializer, ValidationError, Primary
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from blog_api.users.api.serializers import UserSerializer
 from blog_api.users.models import VerificationCode
 from blog_api.posts.models import Post
 

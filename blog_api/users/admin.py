@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from blog_api.users.models import VerificationCode, PasswordResetCode
+from blog_api.users.models import VerificationCode, PasswordResetCode, UserFollowing
 from blog_api.users.forms import UserChangeForm, UserCreationForm
 
 
@@ -103,3 +103,20 @@ class PasswordResetCodeAdmin(admin.ModelAdmin):
     list_display = ["password_reset_code", "user", "code_expiration"]
     search_fields = []
     readonly_fields = ["password_reset_code", "created_at", "updated_at",]
+
+
+@admin.register(UserFollowing)
+class UserFollowingAdmin(admin.ModelAdmin):
+    fieldsets = (
+        (
+            None, 
+            {
+                "fields": (
+                    "user", 
+                    "following", 
+                )
+            }
+        ),
+    )
+    list_display = ["user", "following"]
+    search_fields = ["user",]

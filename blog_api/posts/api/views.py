@@ -23,7 +23,8 @@ def posts(request):
     '''
     posts = Post.objects.prefetch_related('bookmarks')      \
                         .select_related('previouspost')     \
-                        .select_related('nextpost')
+                        .select_related('nextpost')         \
+                        .filter(is_active=True)
     
     serialized_posts = PostSerializer(posts, many=True).data
     return Response({
@@ -175,3 +176,7 @@ def post_update(request):
                 'message': serializer.errors
             }, status=HTTP_400_BAD_REQUEST
         )
+
+
+# @api_view(['POST'])
+# @permission_classes(())

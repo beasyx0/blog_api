@@ -531,3 +531,41 @@ def user(request):
     return Response({
         'user': serialized_user 
     }, status=HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+def user_follow(request):
+    '''
+    --User follow unfollow view--
+    ==========================================================================================================
+    :param: follow_pub_id str (required)
+    1) Checks for follow_pub_id in request. If not returns 400 and message.
+    2) Gets the current user.
+    3) Calls follow_user on user model. Returns 200 or 400 and appropriate message.
+    :returns: boolean followed.
+    :returns: str message.
+    :returns: Response.HTTP_STATUS_CODE.
+    ==========================================================================================================
+    '''
+    follow_pub_id = request.data.get('follow_pub_id', None)
+    if not follow_pub_id:
+        return Response({
+            'followed': False,
+            'message': 'Please post a valid id of a user to follow.'
+        },status=HTTP_400_BAD_REQUEST)
+
+    user = request.user
+
+    followed = user.follow_user(follow_pub_id)
+
+    if followed['followed']:
+        return Response({
+            'followed': True,
+            'message': followed['message']
+        }, status=HTTP_201_CREATED)
+    else:
+        return Response({
+            'followed': False,
+            'message': followed['message']
+        }, status=HTTP_200_OK)

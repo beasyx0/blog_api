@@ -1,4 +1,4 @@
-from rest_framework.serializers import Serializer, ModelSerializer, ValidationError, CharField, EmailField
+from rest_framework.serializers import Serializer, ModelSerializer, ValidationError, CharField, EmailField, PrimaryKeyRelatedField, SerializerMethodField
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.validators import UniqueValidator
 
@@ -12,6 +12,10 @@ from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.validators import UnicodeUsernameValidator
 
 from blog_api.users.model_validators import validate_username_max_3_special_chars, validate_name_no_special_chars
+
+from blog_api.users.models import UserFollowing
+from blog_api.posts.models import Post
+from blog_api.posts.api.serializers import PostSerializer
 
 User = get_user_model()
 
@@ -178,10 +182,48 @@ class RegisterSerializer(ModelSerializer):
         return user  # 3
 
 
+class UserFollowingSerializer(ModelSerializer):
+
+    class Meta: 
+        model = UserFollowing
+        fields = ['following',]
+
+
+class UserFollowersSerializer(ModelSerializer):
+
+    class Meta:
+        model = UserFollowing
+        fields = ['user',]
+
+
+class UserPostSerializer(ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['slug', 'title',]
+
+
 class UserSerializer(ModelSerializer):
+
+    following = SerializerMethodField()
+    followers = SerializerMethodField()
+    posts = SerializerMethodField()
+    bookmarks = SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ('pub_id', 'username', 'name', 'email',)
+        fields = ['pub_id', 'username', 'name', 'email', 'followers', 'following', 'posts', 'bookmarks',]
+
+    def get_posts(self, obj):
+        return obj.get_posts()
+
+    def get_following(self, obj):
+        return obj.get_following()
+
+    def get_followers(self, obj):
+        return obj.get_followers()
+
+    def get_bookmarks(self, obj):
+        return obj.get_self_bookmarks()
 
 
 class UpdateUserSerializer(ModelSerializer):

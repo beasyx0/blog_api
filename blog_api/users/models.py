@@ -1,8 +1,8 @@
 import uuid
 from datetime import timedelta
 from django.conf import settings
-from django.db.models import Model, DateTimeField, CharField, EmailField, BooleanField, \
-                                                        GenericIPAddressField, ForeignKey, CASCADE
+from django.db.models import Model, Manager, DateTimeField, CharField, EmailField, BooleanField, \
+                                                        GenericIPAddressField, ForeignKey, CASCADE, UniqueConstraint
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
 from django.urls import reverse
@@ -70,6 +70,77 @@ class User(BaseModel, AbstractUser):
             'password_reset': True,
             'message': 'The password has been reset. Please continue to log in.'
         }
+
+    def follow_user(self, pubid):
+        '''
+        Follow or unfollow a user based on if follow exists already.
+        '''
+        if not User.objects.filter(pub_id=pubid).exists():
+            return {
+                'followed': False,
+                'message': 'No user found with provided id.'
+            }
+        user_to_follow = User.objects.get(pub_id=pubid)
+        if not UserFollowing.objects.filter(user=self, following=user_to_follow).exists():
+            follow = UserFollowing.objects.create(user=self, following=user_to_follow)
+            return {
+                'followed': True,
+                'message': f'{user_to_follow.username} followed successfully.'
+            }
+        else:
+            UserFollowing.objects.filter(user=self, following=user_to_follow).delete()
+            return {
+                'followed': False,
+                'message': f'{user_to_follow.username} unfollowed successfully.'
+            }
+
+    def get_following(self):
+        '''
+        Return a dictionary of the users a user is following.
+        '''
+        self_followings = self.following.all()
+        following = []
+        for follow in self_followings:
+            following.append({'pub_id': follow.following.pub_id, 'username': follow.following.username})
+        return following
+
+    def get_followers(self):
+        '''
+        Return a dictionary of the users followers.
+        '''
+        self_followerss = self.followers.all()
+        followers= []
+        for follow in self_followerss:
+            followers.append({'pub_id': follow.following.pub_id, 'username': follow.following.username})
+        return followers
+
+    def get_posts(self):
+        '''
+        Return all posts by this user.
+        '''
+        from blog_api.posts.models import Post  # avoid import errors
+        self_posts = Post.objects.filter(author=self)
+        posts = []
+        for post in self_posts:
+            posts.append({'slug': post.slug, 'title': post.title})
+        return posts
+
+    def bookmark_post(self):
+        '''
+        Implement this!
+        '''
+        pass
+
+    def get_self_bookmarks(self):
+        '''
+        Return all bookmarked posts for this user
+        '''
+        from blog_api.posts.models import Post  # avoid import errors
+        bookmarked_posts = Post.objects.filter(bookmarks__pub_id=self.pub_id)
+        bookmarks = []
+        for post in bookmarked_posts:
+            bookmarks.append({'slug': post.slug, 'title': post.title})
+        return bookmarks
 
     class Meta:
         ordering = ['-created_at',]
@@ -238,3 +309,36 @@ class PasswordResetCode(BaseModel):
             self.password_reset_code = str(uuid.uuid4().hex)
         return super(PasswordResetCode, self).save(*args, **kwargs)
 
+
+
+class UserFollowing(BaseModel):
+
+    user = ForeignKey(User, related_name='following', on_delete=CASCADE, to_field='pub_id')
+    following = ForeignKey(User, related_name='followers', on_delete=CASCADE, to_field='pub_id')
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['user','following'],  name='unique_followers')
+        ]
+
+        ordering = ['-created_at']
+
+    def clean(self):
+        if self.user.email == self.following.email:
+            raise ValidationError('You can not follow yourself.')
+        return super().clean()
+
+    def __str__(self):
+        return f'{self.user.username} follows {self.following}'
+
+    def get_self_user_pub_id(self):
+        return self.user.pub_id
+
+    def get_self_user_username(self):
+        return self.user.username
+
+    def get_self_following_pub_id(self):
+        return self.following.pub_id
+
+    def get_self_following_username(self):
+        return self.following.username

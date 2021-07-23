@@ -11,6 +11,7 @@
 9) A user can delete his user data and tokens     
 10) A user can request a password reset link and reset his password
 11) A user can request to change his email
+12) A user can follow other users
 
 user model new field ideas:
 1) avatar url
@@ -26,8 +27,8 @@ user model new field ideas:
 5) A user can search for posts
 6) A user can bookmark posts
 7) A user can like/dislike posts
-8) A user can follow other users
-
+8) A user can view all his own blog posts
+9) A user can view all posts by those hes following
 # blog posts
 # tags
 # bookmarks
