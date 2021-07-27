@@ -175,7 +175,6 @@ class RegisterSerializer(ModelSerializer):
             email=validated_data['email'],
             name=validated_data['name'],
         )
-
         user.set_password(validated_data['password'])
         user.save()
 
@@ -188,10 +187,14 @@ class UserSerializer(ModelSerializer):
     following_posts = SerializerMethodField()
     followers = SerializerMethodField()
     bookmarks = SerializerMethodField()
+    follow_counts = SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['pub_id', 'username', 'name', 'email', 'posts', 'following', 'following_posts', 'followers', 'bookmarks',]
+        fields = [
+            'pub_id', 'username', 'name', 'email', 'posts', 'following', 'following_posts', 
+            'followers', 'follow_counts', 'bookmarks', 'date_joined', 
+        ]
 
     def get_posts(self, obj):
         return obj.get_posts()
@@ -205,6 +208,9 @@ class UserSerializer(ModelSerializer):
     def get_followers(self, obj):
         return obj.get_followers()
 
+    def get_follow_counts(self, obj):
+        return obj.get_following_follower_count()
+
     def get_bookmarks(self, obj):
         return obj.get_self_bookmarks()
 
@@ -212,7 +218,7 @@ class UserSerializer(ModelSerializer):
 class UpdateUserSerializer(ModelSerializer):
 
     username = CharField(
-        required=False, 
+        required=True, 
         validators=[
             validate_username_max_3_special_chars,
             UnicodeUsernameValidator(), 

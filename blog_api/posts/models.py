@@ -3,7 +3,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import Manager, Model, DateTimeField, TextField, CharField, EmailField, IntegerField, \
-                                        BooleanField,  ForeignKey, ManyToManyField, SlugField, CASCADE, SET_NULL
+                                                        BooleanField,  ForeignKey, ManyToManyField, SlugField, CASCADE, SET_NULL
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.template.defaultfilters import slugify
 from django.contrib.postgres.search import SearchVectorField
@@ -38,7 +39,7 @@ class Post(BaseModel):
     title = CharField(max_length=255, blank=False, null=False)
     author = ForeignKey(User, on_delete=SET_NULL, null=True, related_name='posts')
     featured = BooleanField(default=False)
-    estimated_reading_time = IntegerField(default=0)
+    estimated_reading_time = IntegerField(default=0, editable=False)
     content = TextField(blank=False, null=False)
     bookmarks = ManyToManyField(User, related_name='bookmarked_posts', blank=True)
     previouspost = ForeignKey('self', related_name='previous_post', on_delete=SET_NULL, blank=True, null=True)

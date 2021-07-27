@@ -8,9 +8,16 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
 from blog_api.posts.models import Post
-from blog_api.posts.api.serializers import PostSerializer, UpdatePostSerializer 
+from blog_api.posts.api.serializers import PostSerializer
 from blog_api.posts.api.permissions import PostIsOwnerOrReadOnly
 from blog_api.users.models import User
+
+
+def get_paginated_queryset(request, qs, serializer_obj):
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(qs, request)
+    serializer = serializer_obj(page, many=True, context={'request': request})
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(['GET'])
@@ -22,16 +29,11 @@ def posts(request):
     Returns nested representations of all posts. Paginates the quereyset.
     ==========================================================================================================
     '''
-    posts_to_paginate = Post.objects.prefetch_related('bookmarks')      \
-                                    .select_related('previouspost')     \
-                                    .select_related('nextpost')         \
-                                    .filter(is_active=True)
+    posts_to_paginate = \
+        Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost')         \
+                                                                                            .filter(is_active=True)
+    all_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
 
-    paginator = PageNumberPagination()
-    page = paginator.paginate_queryset(posts, request)
-    serializer = PostSerializer(page, many=True, context={'request': request})
-    all_posts = paginator.get_paginated_response(serializer.data)
-    
     return all_posts
 
 
@@ -89,6 +91,37 @@ def post_create(request):
     )
 
 
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+def post_detail(request):
+    '''
+    --Post detail view--
+    1) Attempts to pull the post_slug from request. If no returns 400 and message.
+    2) Attempts to pull up the post object with provided post_slug. If not found
+       returns 400 and message.
+    3) Serializes and returns the post object.
+    '''
+    post_slug = request.data.get('post_slug', None)
+    if not post_slug:
+        return Response({
+                'message': 'Please post a valid post slug to get post.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        post = Post.objects.get(slug=post_slug)
+    except Post.DoesNotExist:
+        return Response({
+                'message': 'No post found with provided slug.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+    serialized_post = PostSerializer(post).data
+    return Response({
+            'post': serialized_post
+        }, status=HTTP_200_OK
+    )
+
+
 @api_view(['PUT'])
 @permission_classes((IsAuthenticated,))
 def post_update(request):
@@ -104,31 +137,34 @@ def post_update(request):
     :returns: Response.HTTP_STATUS_CODE.
     :returns: boolean updated.
     1) Extract variables from the request, set defaults to avoid errors.
-    2) Attempt to extract the post slug from the request. If none returns 400 and message.
-    3) Checks that there's at least one argument in the request. If no returns 400 and message.
+    2) If title in request returns 400 and message.
+    3) Attempt to extract the post slug from the request. If none returns 400 and message.
     4) Attempts to lookup the post to update by slug. If no returns 400 and message.
-    5) If next post or previous post slugs included in request adds them to the request data. If the slug
-       doesn't match catches exception and returns 400 and message.
-    6) Serializes the request data.
-    7) Attempts to save the PostUpdateSerializer. Returns 200 and message. If errors returns 400 and message.
+    5) Checks to make sure the user is the author of the post to update. If not returns 400 and message.
+    6) If next post or previous post slugs included in request adds them to the request data. If the slug
+       doesn't match catches exception and returns 400 and message. Checks that next and previous post is 
+       not to self.
+    7) Serializes the request data.
+    8) Attempts to save the PostUpdateSerializer. Returns 200 and message. If errors returns 400 and message.
     ==========================================================================================================
     '''
-    partial = request.data.get('partial', False)  # ?? Is partial even working ??
+    partial = request.data.get('partial', False)
+    title = request.data.get('title', None)
     next_post_slug = request.data.get('next_post', None)
     previous_post_slug = request.data.get('previous_post', None)  # 1
+
+    if title:
+        return Response({
+                'updated': False,
+                'message': 'You can not update the title.'  # 2
+            }, status=HTTP_400_BAD_REQUEST
+        )
 
     post_slug = request.data.get('slug', None)
     if not post_slug:
         return Response({
                 'updated': False,
-                'message': 'Something went wrong, please try again.'  # 2
-            }, status=HTTP_400_BAD_REQUEST
-        )
-
-    if not request.data.keys():
-        return Response({
-                'updated': False,
-                'message': 'You need to include at least one field to update.'  # 3
+                'message': 'Something went wrong, please try again.'  # 3
             }, status=HTTP_400_BAD_REQUEST
         )
 
@@ -141,9 +177,21 @@ def post_update(request):
             }, status=HTTP_400_BAD_REQUEST
         )
 
+    if not post.author == request.user:
+        return Response({
+                'updated': False,
+                'message': 'You can only update your own post.'  # 5
+            }, status=HTTP_400_BAD_REQUEST)
+
     if next_post_slug:
         try:
-            next_post_id = Post.objects.get(slug=next_post_slug).id  # 5
+            next_post_id = Post.objects.get(slug=next_post_slug).id  # 6
+            if next_post_id == post.id:
+                return Response({
+                        'updated': False,
+                        'message': 'Next post cannot be to self.'
+                    }, status=HTTP_400_BAD_REQUEST
+                )
             request.data['nextpost'] = next_post_id
         except Post.DoesNotExist:
             return Response({
@@ -155,6 +203,12 @@ def post_update(request):
     if previous_post_slug:
         try:
             previous_post_id = Post.objects.get(slug=previous_post_slug).id
+            if previous_post_id == post.id:
+                return Response({
+                        'updated': False,
+                        'message': 'Previous post cannot be to self.'
+                    }, status=HTTP_400_BAD_REQUEST
+                )
             request.data['previouspost'] = previous_post_id
         except Post.DoesNotExist:
             return Response({
@@ -163,9 +217,9 @@ def post_update(request):
                 }, status=HTTP_400_BAD_REQUEST
             )
 
-    serializer = UpdatePostSerializer(post, data=request.data, partial=partial)  # 6
+    serializer = PostSerializer(post, data=request.data, partial=partial)  # 7
 
-    if serializer.is_valid():  # 7
+    if serializer.is_valid():  # 8
         serializer.save()
         return Response({
                 'updated': True,

@@ -30,8 +30,8 @@ class PostSerializer(ModelSerializer):
 
     nextpost = PrimaryKeyRelatedField(  # prefetch related and select related for faster lookups
     allow_null=True, 
-    queryset=Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost'), 
-    required=False
+        queryset=Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost'), 
+        required=False
     )
     previouspost = PrimaryKeyRelatedField(
         allow_null=True, 
@@ -45,6 +45,7 @@ class PostSerializer(ModelSerializer):
             'slug', 'title', 'author', 'featured',
             'estimated_reading_time', 'content', 
             'bookmarks', 'previouspost', 'nextpost',
+            'created_at', 'updated_at',
         ]
 
     def to_representation(self, instance):
@@ -72,18 +73,3 @@ class PostSerializer(ModelSerializer):
             previouspost=validated_data.get('previouspost', None),
         )
         return post
-
-
-class UpdatePostSerializer(ModelSerializer):
-
-    class Meta:
-        model = Post
-        fields = ['content', 'featured', 'nextpost', 'previouspost',]
-
-    def to_representation(self, instance):
-        '''
-        Nested serializers.
-        '''
-        self.fields['nextpost'] = NextPostPreviousPostSerializer()
-        self.fields['previouspost'] = NextPostPreviousPostSerializer() 
-        return super(UpdatePostSerializer, self).to_representation(instance)

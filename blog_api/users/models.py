@@ -36,7 +36,7 @@ class User(BaseModel, AbstractUser):
     '''User model. New users are inactive until verified through email'''
     pub_id = CharField(editable=False, unique=True, max_length=50)
     username = CharField(
-        max_length=150, unique=True, 
+        max_length=150, unique=True, null=False, blank=False,
         validators=[
             UnicodeUsernameValidator, validate_username_min_3_letters, validate_username_max_3_special_chars
         ]
@@ -126,6 +126,14 @@ class User(BaseModel, AbstractUser):
             followers.append({'pub_id': follow.user.pub_id, 'username': follow.user.username})
         return followers
 
+    def get_following_follower_count(self):
+        following_count = self.following.all().count()
+        followers_count = self.followers.all().count()
+        return {
+            'following_count': following_count,
+            'followers_count': followers_count
+        }
+
     def get_posts(self):
         '''
         Return all posts by this user.
@@ -141,7 +149,7 @@ class User(BaseModel, AbstractUser):
         '''
         Bookmarks a post for this user.
         '''
-        from blog_api.posts.models import Post
+        from blog_api.posts.models import Post  # avoid circular imports
         try:
             post_to_bookmark = Post.objects.get(slug=slug)
         except Post.DoesNotExist:
@@ -340,16 +348,19 @@ class UserFollowing(BaseModel):
         constraints = [
             UniqueConstraint(fields=['user','following'],  name='unique_followers')
         ]
-
         ordering = ['-created_at']
 
     def clean(self):
         if self.user.email == self.following.email:
-            raise ValidationError('You can not follow yourself.')
+            raise ValidationError({'following': 'You can not follow yourself.'})
         return super().clean()
 
     def __str__(self):
         return f'{self.user.username} follows {self.following}'
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super(UserFollowing, self).save(*args, **kwargs)
 
     # def get_self_user_pub_id(self):
     #     return self.user.pub_id

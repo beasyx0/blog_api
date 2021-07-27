@@ -54,16 +54,16 @@ def user_register(request):
             user = User.objects.get(username=user_desired_username)  # one of them exists
 
         verification = user.verification_codes.latest('created_at').send_user_verification_email()
-        if not verification['verification_sent']:
+        if verification['verification_sent']:
             return Response({
                     'registered': False,
-                    'message': verification['message']
+                    'message': 'A user with those credentials already exists and is inactive. ' + verification['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
         else:
             return Response({
                     'registered': False,
-                    'message': 'A user with those credentials already exists and is inactive. ' + verification['message']
+                    'message': verification['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
 
@@ -122,21 +122,20 @@ def user_verify(request):
         )
 
     try:
-
         verification_code_obj = VerificationCode.objects.get(verification_code=verification_code)  # 2
         verified = verification_code_obj.verify()  # 3
-        if not verified['verified']:
+        if verified['verified']:
             return Response({
-                    'verified': verified['verified'],
+                    'verified': True,
+                    'message': verified['message'],
+                }, status=HTTP_200_OK
+            )
+        else:
+            return Response({
+                    'verified': False,
                     'message': verified['message'],
                 }, status=HTTP_400_BAD_REQUEST
             )
-        return Response({
-                'verified': verified['verified'],
-                'message': verified['message'],
-            }, status=HTTP_200_OK
-        )
-
     except VerificationCode.DoesNotExist:
         return Response({
                 'verified': False,
@@ -178,7 +177,6 @@ def user_verify_resend(request):
         )
     
     try:
-
         user = User.objects.get(email=email)  # 3
         if not user.check_password(password):
             return Response({
@@ -203,7 +201,7 @@ def user_verify_resend(request):
                 }, status=HTTP_400_BAD_REQUEST
             )
 
-    except User.DoesNotExist as e:
+    except User.DoesNotExist:
         return Response({
                 'verifification_sent': False,
                 'message': 'No user found with provided email.'
@@ -304,7 +302,6 @@ def user_password_reset_send(request):
         )
 
     try:
-
         user = User.objects.get(email=email)  # 2
 
         codes_exist = PasswordResetCode.objects.filter(user=user).exists()
@@ -318,7 +315,6 @@ def user_password_reset_send(request):
             )
 
         code = PasswordResetCode.objects.create(user=user)  # 4
-
         password_reset_link_sent = code.send_user_password_reset_email()
 
         return Response({
@@ -326,7 +322,6 @@ def user_password_reset_send(request):
                 'message': password_reset_link_sent['message']
             }, status=HTTP_200_OK
         )
-
     except User.DoesNotExist:
         return Response({
                 'message': 'No user found with the provided email.'
@@ -368,7 +363,7 @@ def user_password_reset(request):
                 'message': 'Please post two new matching passwords to reset password.'
             }, status=HTTP_400_BAD_REQUEST
         )
-    
+
     if password != password2:
         return Response({
                 'password_reset': False,
@@ -377,24 +372,21 @@ def user_password_reset(request):
         )
 
     try:
-
         password_reset_code_object = PasswordResetCode.objects.get(password_reset_code=password_reset_code)  # 4
-
         password_reset = password_reset_code_object.verify(password)  # 5
 
-        if not password_reset['password_reset']:
+        if password_reset['password_reset']:
             return Response({
-                    'password_reset': password_reset['password_reset'],
-                    'message': password_reset['message']
-                }, status=HTTP_400_BAD_REQUEST
-            )
-        else:
-            return Response({
-                    'password_reset': password_reset['password_reset'],
+                    'password_reset': True,
                     'message': password_reset['message']
                 }, status=HTTP_200_OK
             )
-
+        else:
+            return Response({
+                    'password_reset': False,
+                    'message': password_reset['message']
+                }, status=HTTP_400_BAD_REQUEST
+            )
     except PasswordResetCode.DoesNotExist:
         return Response({
                 'password_reset': False,
@@ -487,7 +479,6 @@ def user_delete(request):
         )
 
     try:
-
         token = RefreshToken(token_str)  # 3
         try:
             token.blacklist()  # 4
@@ -523,14 +514,29 @@ def user(request):
     :param: request.user
     :returns: User serialized.
     :returns: Response.HTTP_STATUS_CODE.
-    1) Grabs the user from request. Returns 200.
+    1) Attempts to get the user_pub_id from request. If no sets to None.
+    2) If no user_pub_id in request sets request.user as user.
+    3) Attempts to get the user with provided user_pub_id. If no returns 400.
+    4) Serialize and returns the user.
     ==========================================================================================================
     '''
-    user = request.user
-    serialized_user = UserSerializer(user).data
+    user_pub_id = request.data.get('user_pub_id', None)  # 1
+
+    if not user_pub_id:
+        user = request.user  # 2
+    else:
+        try:
+            user = User.objects.get(pub_id=user_pub_id)  # 3
+        except User.DoesNotExist:
+            return Response({
+                    'message': 'No user found with provided user id.'
+                }, status=HTTP_400_BAD_REQUEST
+            )
+    serialized_user = UserSerializer(user).data  # 4
     return Response({
-        'user': serialized_user 
-    }, status=HTTP_200_OK)
+                'user': serialized_user 
+            }, status=HTTP_200_OK
+        )
 
 
 @api_view(['POST'])

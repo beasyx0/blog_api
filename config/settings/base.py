@@ -356,7 +356,8 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
+# choose wether to login with email or username
+SIMPLE_JWT_LOGIN_USERNAME_FIELD = 'email'
+
 # url for the frontend app that consumes this api
 FRONTEND_URL = env("FRONTEND_URL", default="https://www.my-react-frontend.com/")
-
-SIMPLE_JWT_LOGIN_USERNAME_FIELD = 'email'

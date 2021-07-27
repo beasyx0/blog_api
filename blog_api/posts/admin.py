@@ -31,7 +31,7 @@ class PostAdmin(admin.ModelAdmin):
             }),
         )
     filter_horizontal = ['bookmarks',]
-    readonly_fields = ('created_at', 'updated_at', 'slug',)
+    readonly_fields = ('created_at', 'updated_at', 'slug', 'estimated_reading_time',)
 
     def get_queryset(self, request):
         qs = super(PostAdmin, self).get_queryset(request)
