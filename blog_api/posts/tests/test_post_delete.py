@@ -73,6 +73,7 @@ class PostTestsUpdate(APITestCase):
         }
         delete_post_response = self.client.post(delete_post_url, delete_post_data, format='json')
         self.assertEqual(delete_post_response.status_code, HTTP_204_NO_CONTENT)
+        print('Done.....')
 
     def test_user_can_only_delete_own_posts(self):
         print('Testing user can only delete his own posts')
@@ -125,3 +126,4 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(delete_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(delete_post_response.data['deleted'], False)
         self.assertEqual(delete_post_response.data['message'], 'You can only delete your own post.')
+        print('Done.....')

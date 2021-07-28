@@ -38,6 +38,9 @@ class PostTestsUpdate(APITestCase):
         }
 
     def test_authenticated_user_can_update_post(self):
+        '''
+        Ensure a user can update a post while authenticated
+        '''
         print('Testing authenticated user can create new post')
 
         register_url = reverse('user-register')
@@ -77,6 +80,7 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.data['updated'], True)
         self.assertEqual(update_post_response.data['message'], 'Post updated successfully.')
         self.assertEqual(update_post_response.data['post']['content'], 'Lorem ipsum dolor sit amet, Praesent id fermentum orci.')
+        print('Done.....')
 
     def test_user_cannot_update_post_title(self):
         print('Testing user can not update a post title')
@@ -118,6 +122,7 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.status_code, HTTP_200_OK)
         self.assertEqual(update_post_response.data['updated'], True)
         self.assertEqual(update_post_response.data['post']['title'], new_post.title)
+        print('Done.....')
 
     def test_user_cannot_update_post_wrong_slug(self):
         print('Testing user can not update a post with wrong slug')
@@ -158,6 +163,7 @@ class PostTestsUpdate(APITestCase):
         update_post_response = self.client.put(update_post_url, update_post_data, format='json')
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
+        print('Done.....')
 
     def test_user_cannot_update_post_wrong_next_post_slug(self):
         print('Testing user can not update a post with wrong next post slug')
@@ -200,6 +206,7 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
         self.assertEqual(update_post_response.data['message'], 'No post found with provided next post slug.')
+        print('Done.....')
 
     def test_user_cannot_update_post_wrong_previous_post_slug(self):
         print('Testing user can not update a post with wrong previous post slug')
@@ -242,6 +249,7 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
         self.assertEqual(update_post_response.data['message'], 'No post found with provided previous post slug.')
+        print('Done.....')
 
     def test_user_cannot_update_post_previous_post_to_self(self):
         print('Testing user can not update a post with previous post to self.')
@@ -284,6 +292,7 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
         self.assertEqual(update_post_response.data['message'], 'Previous post cannot be to self.')
+        print('Done.....')
 
     def test_user_cannot_update_post_next_post_to_self(self):
         print('Testing user can not update a post with next post to self.')
@@ -326,7 +335,7 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
         self.assertEqual(update_post_response.data['message'], 'Next post cannot be to self.')
-
+        print('Done.....')
 
     def test_user_cannot_update_post_not_author(self):
         print('Testing user can not update post if not the author')
@@ -370,3 +379,4 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
         self.assertEqual(update_post_response.data['message'], 'You can only update your own post.')
+        print('Done.....')

@@ -50,10 +50,10 @@ class UserTestsRead(APITestCase):
                 content=self.blog_post_data['content']
             )
 
-        liked = user.like_post(post.slug)
+        liked = user.like_post(post.slug, like='like')
         self.assertEqual(liked['liked'], True)
         self.assertEqual(liked['message'], f'{user.username} liked {post.slug} successfully.')
-        disliked = user.like_post(post.slug)
+        disliked = user.like_post(post.slug, like='dislike')
         self.assertEqual(disliked['liked'], False)
         self.assertEqual(disliked['message'], f'{user.username} disliked {post.slug} successfully.')
 

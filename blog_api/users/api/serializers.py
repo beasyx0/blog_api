@@ -150,7 +150,7 @@ class RegisterSerializer(ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('username', 'name', 'email', 'password', 'password2',)
+        fields = ['username', 'name', 'email', 'password', 'password2',]
 
     def validate(self, attrs):
         '''
@@ -182,42 +182,20 @@ class RegisterSerializer(ModelSerializer):
 
 
 class UserSerializer(ModelSerializer):
-    follow_counts = SerializerMethodField()
     post_count = SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'pub_id', 'username', 'name', 'email', 'post_count', 'follow_counts', 'date_joined', 
+            'pub_id', 'username', 'name', 'email', 'post_count', 'following_count', 
+            'followers_count', 'date_joined', 
+        ]
+        read_only_fields = [
+            'pub_id', 'email', 'post_count', 'following_count', 'followers_count', 'date_joined',
         ]
 
     def get_post_count(self, obj):
         return obj.get_post_count()
-
-    def get_follow_counts(self, obj):
-        return obj.get_following_follower_count()
-
-
-class UpdateUserSerializer(ModelSerializer):
-
-    username = CharField(
-        required=True, 
-        validators=[
-            validate_username_max_3_special_chars,
-            UnicodeUsernameValidator(), 
-            UniqueValidator(queryset=User.objects.all())
-        ]
-    )
-    name = CharField(
-        allow_blank=True, 
-        allow_null=True, 
-        max_length=255, 
-        required=False, 
-        validators=[validate_name_no_special_chars])
-    
-    class Meta:
-        model = User
-        fields = ('username', 'name',)
 
 
 class UserFollowingSerializer(ModelSerializer):

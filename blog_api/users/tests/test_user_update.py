@@ -195,6 +195,7 @@ class UserTestsUpdate(APITestCase):
         self.assertEqual(update_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_response.data['updated'], False)
         self.assertEqual(update_response.data['message'], 'You cannot update your email.')
+        print('Done.....')
 
     def test_user_cannot_update_unique_username(self):
         '''

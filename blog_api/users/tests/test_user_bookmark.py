@@ -66,6 +66,7 @@ class UserTestsRead(APITestCase):
         self.assertEqual(bookmark_response.status_code, HTTP_201_CREATED)
         self.assertEqual(bookmark_response.data['bookmarked'], True)
         self.assertEqual(bookmark_response.data['message'], 'Post ' + post.slug + ' bookmarked successfully.')
+        print('Done.....')
 
     def test_user_can_unbookmark_posts(self):
         '''
@@ -107,6 +108,7 @@ class UserTestsRead(APITestCase):
         self.assertEqual(bookmark_response.status_code, HTTP_200_OK)
         self.assertEqual(bookmark_response.data['bookmarked'], False)
         self.assertEqual(bookmark_response.data['message'], 'Post ' + post.slug + ' un-bookmarked successfully.')
+        print('Done.....')
 
     def test_user_cannot_bookmark_own_post(self):
         '''
@@ -139,6 +141,7 @@ class UserTestsRead(APITestCase):
         self.assertEqual(bookmark_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(bookmark_response.data['bookmarked'], False)
         self.assertEqual(bookmark_response.data['message'], 'You can not bookmark your own post.')
+        print('Done.....')
 
     def test_user_cannot_bookmark_wrong_slug(self):
         '''
@@ -180,6 +183,7 @@ class UserTestsRead(APITestCase):
         self.assertEqual(bookmark_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(bookmark_response.data['bookmarked'], False)
         self.assertEqual(bookmark_response.data['message'], 'No post found with provided slug.')
+        print('Done.....')
 
     def test_user_cannot_bookmark_inactive_post(self):
         print('Testing user can not bookmark inactive post')
@@ -224,4 +228,4 @@ class UserTestsRead(APITestCase):
         bookmark_response = self.client.post(bookmark_url, bookmark_data, format='json')
         self.assertEqual(bookmark_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(bookmark_response.data['message'], 'No post found with provided slug.')
-
+        print('Done.....')

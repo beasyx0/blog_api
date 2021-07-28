@@ -1,3 +1,4 @@
+from datetime import timedelta
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_401_UNAUTHORIZED, \
                                                                         HTTP_403_FORBIDDEN, HTTP_400_BAD_REQUEST
 from rest_framework.test import APITestCase
@@ -29,11 +30,11 @@ class PostTestsRead(APITestCase):
             'content': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed facilisis nunc id orci hendrerit, id tempor lorem tincidunt. Praesent id fermentum orci. Proin malesuada est sed nisl aliquam, ac congue nibh sagittis. Vestibulum sed ipsum vulputate, sodales neque auctor, mollis odio. Nullam sit amet mattis ante. Aenean mi sapien, aliquet eget sapien ac, finibus accumsan erat. Donec pretium risus faucibus ultrices egestas. In at aliquam magna. Pellentesque vitae felis est. Sed at augue ipsum. Cras mi nunc, efficitur a malesuada ac, vulputate a mauris. Mauris congue congue dui, eu maximus ante vulputate nec. Vivamus in lorem nec quam ultricies tincidunt ultrices in lectus. Quisque semper posuere libero sit amet tempor. In quis augue quam. Mauris eget risus in ante congue mattis a in est. Duis porta ornare placerat. In lacinia felis metus, ac dignissim est ultrices eu. Aenean nec massa eget mi maximus tempor. In quis leo condimentum, vulputate urna eget, accumsan ex. Vestibulum bibendum ante ac lobortis convallis.',
         }
 
-    def test_user_can_get_all_posts_unauthenticated(self):
+    def test_user_can_get_all_posts(self):
         '''
-        Ensure a user can get all posts unauthenticated.
+        Ensure a user can get all posts.
         '''
-        print('Testing a user can get a list of all posts unauthenticated')
+        print('Testing a user can get a list of all posts')
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
@@ -55,53 +56,429 @@ class PostTestsRead(APITestCase):
         all_posts_response = self.client.get(all_posts_url)
         self.assertEqual(all_posts_response.status_code, 200)
         self.assertEqual(Post.objects.all().count(), 10)
+        print('Done.....')
 
-# TODO: Write tests for get requests with params.
+    def test_user_can_get_all_featured_posts(self):
+        '''
+        Ensure a user can get all posts that are featured.
+        '''
+        print('Testing user can get all posts that are featured')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        featured_posts_url = reverse('posts-featured')
 
-    # def test_user_can_get_all_post_bookmark_users(self):
-    #     '''
-    #     Ensure a user can get all the users who bookmarked a post instance
-    #     '''
-    #     print('Testing user can get all bookmark users for post instance')
-    #     register_url = reverse('user-register')
-    #     verification_url = reverse('user-verify')
-    #     login_url = reverse('user-login')
-    #     post_bookmarks_url = reverse('post-bookmarks')
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
 
-    #     reg_response = self.client.post(register_url, self.user_data, format='json')
-    #     self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
-    #     reg2_response = self.client.post(register_url, self.user2_data, format='json')
-    #     self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
 
-    #     for vcode in VerificationCode.objects.all():
-    #         verificaton_data = {
-    #             'verification_code': vcode.verification_code
-    #         }
-    #         verification_response = self.client.post(verification_url, verificaton_data, format='json')
-    #         self.assertEqual(verification_response.status_code, HTTP_200_OK)
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
 
-    #     post = Post.objects.create(
-    #             author=User.objects.get(username=self.user_data['username']),
-    #             title=self.blog_post_data['title'],
-    #             content=self.blog_post_data['content']
-    #     )
-    #     post.bookmarks.set([User.objects.get(username=self.user2_data['username'])])
-    #     post.save()
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
 
-    #     login_data = {
-    #         'email': self.user_data['email'],
-    #         'password': self.user_data['password']
-    #     }
-    #     new_login = self.client.post(login_url, login_data, format='json')
-    #     self.assertEqual(new_login.status_code, HTTP_200_OK)
+        self.blog_post_data['featured'] = True
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
 
-    #     self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        self.blog_post_data['featured'] = False
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
 
-    #     post_bookmarks_data = {
-    #         'post_to_bookmark': post.slug
-    #     }
+        featured_posts_response = self.client.get(featured_posts_url)
+        self.assertEqual(featured_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(featured_posts_response.data['results']), 1)
 
-    #     post_bookmarks_response = self.client.get(post_bookmarks_url, data=post_bookmarks_data, format='json')
-    #     self.assertEqual(post_bookmarks_response.status_code, HTTP_200_OK)
+        print('Done.....')
 
-    #     print('Done.....')
+    def test_user_can_get_all_featured_posts_only_active(self):
+        '''
+        Ensure a user can get all posts that are featured only active posts
+        '''
+        print('Testing user can get all posts that are featured only active')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        featured_posts_url = reverse('posts-featured')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        self.blog_post_data['featured'] = True
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        inactive_post = Post.objects.first()
+        inactive_post.is_active = False
+        inactive_post.save()
+
+        featured_posts_response = self.client.get(featured_posts_url)
+        self.assertEqual(featured_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(featured_posts_response.data['results']), 1)
+
+        print('Done.....')
+
+    def test_user_can_get_all_most_liked_posts(self):
+        '''
+        Ensure a user can get all posts that are most liked in order by most liked.
+        '''
+        print('Testing user can get all posts that are most liked ordered by most liked')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        most_liked_posts_url = reverse('posts-most-liked')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg_response2 = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response2.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        user1 = User.objects.first()
+        user2 = User.objects.last()
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        post1.likes.users.add(user1)
+        post1.likes.users.add(user2)
+
+        post2.likes.users.add(user2)
+
+        most_liked_posts_response = self.client.get(most_liked_posts_url)
+        self.assertEqual(most_liked_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(most_liked_posts_response.data['results'][0]['slug'], post1.slug)
+
+        print('Done.....')
+
+    def test_user_can_get_all_most_liked_posts_only_active(self):
+        '''
+        Ensure a user can get all posts that are most liked in order by most liked only active posts.
+        '''
+        print('Testing user can get all posts that are most liked ordered by most liked only active')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        most_liked_posts_url = reverse('posts-most-liked')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg_response2 = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response2.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        user1 = User.objects.first()
+        user2 = User.objects.last()
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        post1.likes.users.add(user1)
+        post1.likes.users.add(user2)
+
+        post2.likes.users.add(user2)
+
+        post1.is_active = False
+        post1.save()
+
+        most_liked_posts_response = self.client.get(most_liked_posts_url)
+        self.assertEqual(most_liked_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(most_liked_posts_response.data['results']), 1)
+
+        print('Done.....')
+
+    def test_user_can_get_all_most_disliked_posts(self):
+        '''
+        Ensure a user can get all posts that are most disliked in order by most disliked.
+        '''
+        print('Testing user can get all posts that are most disliked ordered by most disliked')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        most_disliked_posts_url = reverse('posts-most-disliked')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg_response2 = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response2.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        user1 = User.objects.first()
+        user2 = User.objects.last()
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        post1.dislikes.users.add(user1)
+        post1.dislikes.users.add(user2)
+
+        post2.dislikes.users.add(user2)
+
+        most_disliked_posts_response = self.client.get(most_disliked_posts_url)
+        self.assertEqual(most_disliked_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(most_disliked_posts_response.data['results'][0]['slug'], post1.slug)
+
+        print('Done.....')
+
+    def test_user_can_get_all_most_disliked_posts_only_active(self):
+        '''
+        Ensure a user can get all posts that are most disliked in order by most disliked only active posts.
+        '''
+        print('Testing user can get all posts that are most disliked ordered by most disliked only active')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        most_disliked_posts_url = reverse('posts-most-disliked')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg_response2 = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response2.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        user1 = User.objects.first()
+        user2 = User.objects.last()
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        post1.dislikes.users.add(user1)
+        post1.dislikes.users.add(user2)
+
+        post2.dislikes.users.add(user2)
+
+        post1.is_active = False
+        post1.save()
+
+        most_disliked_posts_response = self.client.get(most_disliked_posts_url)
+        self.assertEqual(most_disliked_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(most_disliked_posts_response.data['results']), 1)
+
+        print('Done.....')
+
+    def test_user_can_get_oldest_posts(self):
+        '''
+        Ensure a user can get all posts in order by oldest.
+        '''
+        print('Testing user can get all posts by oldest')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        oldest_posts_url = reverse('posts-oldest')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        post1.created_at = post1.created_at - timedelta(days=7)
+        post1.save()
+
+        oldest_posts_response = self.client.get(oldest_posts_url)
+        self.assertEqual(oldest_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(oldest_posts_response.data['results'][0]['slug'], post1.slug)
+
+    def test_user_can_get_oldest_posts_only_active(self):
+        '''
+        Ensure a user can get all posts in order by oldest only active posts
+        '''
+        print('Testing user can get all posts by oldest only active posts')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        oldest_posts_url = reverse('posts-oldest')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        post1.is_active = False
+        post1.save()
+
+        oldest_posts_response = self.client.get(oldest_posts_url)
+        self.assertEqual(oldest_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(oldest_posts_response.data['results']), 1)

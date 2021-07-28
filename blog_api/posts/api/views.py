@@ -8,8 +8,10 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
 
+from django.db.models import Q, Count, F
+
 from blog_api.posts.models import Post
-from blog_api.posts.api.serializers import AuthorBookmarkSerializer, PostSerializer, PostUpdateSerializer
+from blog_api.posts.api.serializers import AuthorBookmarkLikedSerializer, PostSerializer, PostUpdateSerializer
 from blog_api.posts.api.permissions import PostIsOwnerOrReadOnly
 from blog_api.users.models import User
 
@@ -24,7 +26,7 @@ def get_paginated_queryset(request, qs, serializer_obj):
 @api_view(['GET'])
 @permission_classes((AllowAny,))
 @throttle_classes([AnonRateThrottle])
-def posts(request):
+def all_posts(request):
     '''
     --All posts view--
     ==========================================================================================================
@@ -32,11 +34,97 @@ def posts(request):
     ==========================================================================================================
     '''
     posts_to_paginate = \
-        Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost')         \
-                                                                                            .filter(is_active=True)
+        Post.objects.prefetch_related('bookmarks')\
+                    .select_related('previouspost').select_related('nextpost')\
+                    .filter(is_active=True)
+
     all_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
 
     return all_posts
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def featured_posts(request):
+    '''
+    --All featured posts view--
+    ==========================================================================================================
+    Returns nested representations of all posts that are featured. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    featured_posts_to_paginate = \
+        Post.objects.prefetch_related('bookmarks')\
+                        .select_related('previouspost').select_related('nextpost')\
+                        .filter(is_active=True, featured=True)
+
+    featured_posts = get_paginated_queryset(request, featured_posts_to_paginate, PostSerializer)
+
+    return featured_posts
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def most_liked_posts(request):
+    '''
+    --All most liked posts view--
+    ==========================================================================================================
+    Returns nested representations of all posts by most liked. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    most_liked_posts_to_paginate = \
+        Post.objects.prefetch_related('bookmarks')\
+                    .select_related('previouspost')\
+                    .select_related('nextpost')\
+                    .filter(is_active=True)\
+                    .order_by('-score')
+
+    most_liked_posts = get_paginated_queryset(request, most_liked_posts_to_paginate, PostSerializer)
+
+    return most_liked_posts
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def most_disliked_posts(request):
+    '''
+    --All most disliked posts view--
+    ==========================================================================================================
+    Returns nested representations of all posts by most disliked. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    most_disliked_posts_to_paginate = \
+        Post.objects.prefetch_related('bookmarks')\
+                        .select_related('previouspost')\
+                        .select_related('nextpost')\
+                        .filter(is_active=True)\
+                        .order_by('score')
+
+    most_disliked_posts = get_paginated_queryset(request, most_disliked_posts_to_paginate, PostSerializer)
+
+    return most_disliked_posts
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def oldest_posts(request):
+    '''
+    --All oldest posts view--
+    ==========================================================================================================
+    Returns nested representations of all posts by oldest. Paginates the quereyset.
+    ==========================================================================================================
+    '''
+    posts_to_paginate = \
+        Post.objects.prefetch_related('bookmarks')\
+                    .select_related('previouspost').select_related('nextpost')\
+                    .filter(is_active=True).order_by('created_at')
+
+    oldest_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+
+    return oldest_posts
 
 
 @api_view(['POST'])
@@ -433,13 +521,16 @@ def post_search(request):
 @permission_classes((IsAuthenticated,))
 def post_like(request):
     '''
-    --Post like view--
+    --Post like/dislike view--
     ==========================================================================================================
     :param: str slug (required)
+    :param: str like (required) e.g 'like' or 'dislike'
     1) Checks for slug in request. If no returns 400 and message.
-    2) Attempts to get the post with the provided slug. If no returns 400 and message.
-    3) Gets the current user from request.user.
-    4) Calls like_post() on the user instance. Returns 201 for liked, returns 200 for disliked else 400 and 
+    2) Checks for like keyword in request. If none returns 400 and messsage.
+    3) Checks that the like keyword is either `like` or `dislike`. If no returns 400 and message.
+    4) Attempts to get the post with the provided slug. If no returns 400 and message.
+    5) Gets the current user from request.user.
+    6) Calls like_post() on the user instance. Returns 201 for liked, returns 200 for disliked else 400 and 
        message.
     ==========================================================================================================
     '''
@@ -451,8 +542,24 @@ def post_like(request):
             }, status=HTTP_400_BAD_REQUEST
         )
 
+    like = request.data.get('like', None)  # 2
+    if not like:
+        return Response({
+                'liked': False,
+                'message': 'Please post a valid like or dislike keyword to like or dislike post.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    liked_choices = ['like', 'dislike',]  # 3
+    if not like in liked_choices:
+        return Response({
+                'liked': False,
+                'message': 'Please post either `like` or `dislike` keyword to like or dislike post.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
     try:
-        post = Post.objects.get(slug=post_slug)  # 2
+        post = Post.objects.get(slug=post_slug)  # 4
         if not post.is_active:
             raise Post.DoesNotExist()
     except Post.DoesNotExist:
@@ -462,9 +569,9 @@ def post_like(request):
             }, status=HTTP_400_BAD_REQUEST
         )
 
-    user = request.user  # 3
+    user = request.user  # 5
 
-    liked = user.like_post(post.slug)  # 4
+    liked = user.like_post(post.slug, like)  # 6
     
     if liked['liked']:
         return Response({
@@ -477,7 +584,7 @@ def post_like(request):
             return Response({
                     'liked': liked['liked'],
                     'message': liked['message']
-                }, status=HTTP_200_OK
+                }, status=HTTP_201_CREATED
             )
         else:
             return Response({
@@ -485,3 +592,75 @@ def post_like(request):
                     'message': liked['message']
                 }, status=HTTP_400_BAD_REQUEST
             )
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+@throttle_classes([AnonRateThrottle])
+def post_likes(request):
+    '''
+    --All post likes view--
+    ==========================================================================================================
+    Return all the users who liked a post. Paginates the queryset.
+    :param: str post_slug (required)
+    1) Checks for post slug in request. If no returns 400 and message.
+    2) Attempts to get the post with provided post slug. If no or post is inactive returns 400 and message.
+    3) Gets all the users who liked the post. Paginates queryset. Returns 200 and message.
+    ==========================================================================================================
+    '''
+    post_slug = request.data.get('post_slug', None)
+    if not post_slug:
+        return Response({
+                'message': 'Please post a valid post slug to get likes.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        post = Post.objects.get(slug=post_slug)
+        if not post.is_active:
+            raise Post.DoesNotExist()
+    except Post.DoesNotExist:
+        return Response({
+                'message': 'No post found with provided slug.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    users_liked = post.likes.users.all()
+    all_users_liked = get_paginated_queryset(request, users_liked, AuthorBookmarkLikedSerializer)
+    return all_users_liked
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+@throttle_classes([AnonRateThrottle])
+def post_dislikes(request):
+    '''
+    --All post dislikes view--
+    ==========================================================================================================
+    Return all the users who disliked a post. Paginates the queryset.
+    :param: str post_slug (required)
+    1) Checks for post slug in request. If no returns 400 and message.
+    2) Attempts to get the post with provided post slug. If no or post is inactive returns 400 and message.
+    3) Gets all the users who liked the post. Paginates queryset. Returns 200 and message.
+    ==========================================================================================================
+    '''
+    post_slug = request.data.get('post_slug', None)
+    if not post_slug:
+        return Response({
+                'message': 'Please post a valid post slug to get likes.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        post = Post.objects.get(slug=post_slug)
+        if not post.is_active:
+            raise Post.DoesNotExist()
+    except Post.DoesNotExist:
+        return Response({
+                'message': 'No post found with provided slug.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    users_disliked = post.dislikes.users.all()
+    all_users_disliked = get_paginated_queryset(request, users_disliked, AuthorBookmarkLikedSerializer)
+    return all_users_disliked

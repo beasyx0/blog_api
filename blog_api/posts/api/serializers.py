@@ -8,17 +8,15 @@ from blog_api.posts.models import Post
 from blog_api.posts.validators import validate_title_min_8_words
 
 
-class AuthorBookmarkSerializer(ModelSerializer):
+class AuthorBookmarkLikedSerializer(ModelSerializer):
 
-    follow_counts = SerializerMethodField()
     post_count = SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['pub_id', 'username', 'follow_counts', 'post_count',]
-
-    def get_follow_counts(self, obj):
-        return obj.get_following_follower_count()
+        fields = [
+            'pub_id', 'username', 'following_count', 'followers_count', 'post_count',
+        ]
 
     def get_post_count(self, obj):
         return obj.get_post_count()
@@ -37,7 +35,6 @@ class NextPostPreviousPostSerializer(ModelSerializer):
 class PostSerializer(ModelSerializer):
 
     author = PrimaryKeyRelatedField(allow_null=True, queryset=User.objects.all(), required=False)
-    likes_dislikes_count = SerializerMethodField()
 
     title = CharField(
         max_length=255,
@@ -63,17 +60,19 @@ class PostSerializer(ModelSerializer):
             'slug', 'title', 'author', 'featured',
             'estimated_reading_time', 'content', 
             'previouspost', 'nextpost', 'created_at', 
-            'updated_at', 'likes_dislikes_count',
+            'updated_at', 'likes_count', 'dislikes_count', 
+            'score',
         ]
-
-    def get_likes_dislikes_count(self, obj):
-        return obj.get_likes_dislikes_count()
+        read_only_fields = [
+            'slug', 'estimated_reading_time', 'likes_count', 'dislikes_count', 'score', 
+            'created_at', 'updated_at',
+        ]
 
     def to_representation(self, instance):
         '''
         Nested serializers.
         '''
-        self.fields['author'] = AuthorBookmarkSerializer()
+        self.fields['author'] = AuthorBookmarkLikedSerializer()
         self.fields['nextpost'] = NextPostPreviousPostSerializer()
         self.fields['previouspost'] = NextPostPreviousPostSerializer() 
         return super(PostSerializer, self).to_representation(instance)
@@ -99,7 +98,19 @@ class PostUpdateSerializer(ModelSerializer):
 
     title = SerializerMethodField()
     estimated_reading_time = SerializerMethodField()
-    likes_dislikes_count = SerializerMethodField()
+    
+    nextpost = \
+        PrimaryKeyRelatedField(
+            allow_null=True, required=False, 
+            queryset=Post.objects.prefetch_related('bookmarks')
+                                    .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
+    )
+    previouspost = \
+        PrimaryKeyRelatedField(
+            allow_null=True, required=False, 
+            queryset=Post.objects.prefetch_related('bookmarks')
+                                    .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
+    )
 
     class Meta:
         model = Post
@@ -107,10 +118,12 @@ class PostUpdateSerializer(ModelSerializer):
             'slug', 'title', 'author', 'featured',
             'estimated_reading_time', 'content', 
             'previouspost', 'nextpost', 'created_at', 
-            'updated_at', 'likes_dislikes_count',
+            'updated_at', 'likes_count', 'dislikes_count', 
+            'score',
         ]
         read_only_fields = [
-            'slug', 'title', 'author', 'estimated_reading_time', 
+            'slug', 'title', 'author', 'estimated_reading_time', 'likes_count', 'dislikes_count', 'score', 
+            'created_at', 'updated_at',
         ]
 
     def get_title(self, obj):
@@ -122,14 +135,11 @@ class PostUpdateSerializer(ModelSerializer):
     def get_estimated_reading_time(self, obj):
         return obj.estimated_reading_time
 
-    def get_likes_dislikes_count(self, obj):
-        return obj.get_likes_dislikes_count()
-
     def to_representation(self, instance):
         '''
         Nested serializers.
         '''
-        self.fields['author'] = AuthorBookmarkSerializer()
+        self.fields['author'] = AuthorBookmarkLikedSerializer()
         self.fields['nextpost'] = NextPostPreviousPostSerializer()
         self.fields['previouspost'] = NextPostPreviousPostSerializer() 
         return super(PostUpdateSerializer, self).to_representation(instance)

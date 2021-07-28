@@ -1,7 +1,7 @@
 import uuid
 from datetime import timedelta
 from django.conf import settings
-from django.db.models import Model, Manager, DateTimeField, CharField, EmailField, BooleanField, \
+from django.db.models import Model, Manager, DateTimeField, CharField, EmailField, IntegerField, BooleanField, \
                                                         GenericIPAddressField, ForeignKey, CASCADE, UniqueConstraint
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
@@ -47,6 +47,8 @@ class User(BaseModel, AbstractUser):
     last_name = None
     is_active = BooleanField(default=False)
     ip_address = GenericIPAddressField(editable=False, blank=True, null=True)
+    followers_count = IntegerField(editable=False, default=0)
+    following_count = IntegerField(editable=False, default=0)
 
     def password_reset(self, password):
         try:
@@ -81,26 +83,29 @@ class User(BaseModel, AbstractUser):
                 'message': 'No user found with provided id.'
             }
         user_to_follow = User.objects.get(pub_id=pubid)
+        
         if not UserFollowing.objects.filter(user=self, following=user_to_follow).exists():
             follow = UserFollowing.objects.create(user=self, following=user_to_follow)
+            follow.following.followers_count += 1
+            follow.following.save()
+            self.following_count += 1
+            self.save()
             return {
                 'followed': True,
                 'message': f'{user_to_follow.username} followed successfully.'
             }
+        
         else:
-            UserFollowing.objects.filter(user=self, following=user_to_follow).delete()
+            follow = UserFollowing.objects.get(user=self, following=user_to_follow)
+            follow.following.followers_count -= 1
+            follow.following.save()
+            follow.delete()
+            self.following_count -= 1
+            self.save()
             return {
                 'followed': False,
                 'message': f'{user_to_follow.username} unfollowed successfully.'
             }
-
-    def get_following_follower_count(self):
-        following_count = self.following.all().count()
-        followers_count = self.followers.all().count()
-        return {
-            'following_count': following_count,
-            'followers_count': followers_count
-        }
 
     def bookmark_post(self, slug):
         '''
@@ -126,7 +131,7 @@ class User(BaseModel, AbstractUser):
         from blog_api.posts.models import Post
         return Post.objects.filter(id=self.id).count()
 
-    def like_post(self, slug):
+    def like_post(self, slug, like):
         '''
         Like a post for this user.
         '''
@@ -140,13 +145,23 @@ class User(BaseModel, AbstractUser):
                 'liked': False,
                 'message': 'No post found with provided slug.'
             }
+        if not like:
+            return {
+                'liked': False,
+                'message': 'Please include a `like` or `dislike` keyword to like or dislike.'
+            }
 
-        if self in post.likes.users.all():
+        if like == 'like':
+            liked = post.likes.like(self.pub_id)
+            return liked
+        elif like == 'dislike':
             disliked = post.dislikes.dislike(self.pub_id)
             return disliked
         else:
-            liked = post.likes.like(self.pub_id)
-            return liked
+            return {
+                'liked': False,
+                'message': 'Please include either `like` or `dislike` to like or dislike post.'
+            }
 
     class Meta:
         ordering = ['-created_at',]

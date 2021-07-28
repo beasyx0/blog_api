@@ -48,6 +48,9 @@ class Post(BaseModel):
     nextpost = ForeignKey('self', related_name='next_post', on_delete=SET_NULL, blank=True, null=True)
     is_active = BooleanField(default=True)
     search_vector = SearchVectorField(editable=False, null=True)
+    likes_count = IntegerField(editable=False, default=0)
+    dislikes_count = IntegerField(editable=False, default=0)
+    score = IntegerField(editable=False, default=0)
 
     objects = Manager()
     items = PostManager()
@@ -120,15 +123,6 @@ class Post(BaseModel):
                 'message': f'Post {self.slug} un-bookmarked successfully.'
             }
 
-    def get_likes_dislikes_count(self):
-        likes_count = self.likes.users.all().count()
-        dislikes_count = self.dislikes.users.all().count()
-        return {
-            'likes_count': likes_count,
-            'dislikes_count': dislikes_count,
-            'score': likes_count - dislikes_count
-        }
-
     def save(self, *args, **kwargs):
         if not self.id:
             self.slug = self._get_unique_slug()
@@ -169,6 +163,13 @@ class Like(BaseModel):
             'message': f'{user.username} liked {self.post.slug} successfully.'
         }
 
+    def save(self, *args, **kwargs):
+        if self.id:
+            self.post.likes_count += 1
+            self.post.score += 1
+            self.post.save()
+        return super(Like, self).save(*args, **kwargs)
+
 
 class DisLike(BaseModel):
     post = OneToOneField(Post, null=False, on_delete=CASCADE, related_name='dislikes')
@@ -176,7 +177,7 @@ class DisLike(BaseModel):
 
     class Meta:
         ordering = ['-created_at',]
-        verbose_name_plural = 'DisLikes'
+        verbose_name_plural = 'Dislikes'
 
     def __str__(self):
         return f'{self.users.all().count()} dislikes for {self.post.slug}'
@@ -200,3 +201,10 @@ class DisLike(BaseModel):
             'liked': False,
             'message': f'{user.username} disliked {self.post.slug} successfully.'
         }
+
+    def save(self, *args, **kwargs):
+        if self.id:
+            self.post.dislikes_count -= 1
+            self.post.score -= 1
+            self.post.save()
+        return super(DisLike, self).save(*args, **kwargs)

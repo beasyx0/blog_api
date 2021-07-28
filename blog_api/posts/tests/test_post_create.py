@@ -312,18 +312,142 @@ class PostTestsCreate(APITestCase):
         post = Post.objects.first()
 
         liked_data = {
+            'like': 'like',
             'post_slug': post.slug
         }
         liked_response = self.client.post(like_post_url, liked_data, format='json')
         self.assertEqual(liked_response.status_code, HTTP_201_CREATED)
         self.assertEqual(liked_response.data['liked'], True)
         self.assertEqual(liked_response.data['message'], self.user_data['username'] + ' liked ' + post.slug + ' successfully.')
-
-        liked_response2 = self.client.post(like_post_url, liked_data, format='json')
-        self.assertEqual(liked_response2.status_code, HTTP_200_OK)
-        self.assertEqual(liked_response2.data['liked'], False)
-        self.assertEqual(liked_response2.data['message'], self.user_data['username'] + ' disliked ' + post.slug + ' successfully.')
+        post.refresh_from_db()
+        self.assertEqual(post.likes_count, 1)
 
         print('Done.....')
 
-# todo: test user can not like post wrong slug
+    def test_user_cannot_like_post_wrong_slug(self):
+        print('Testing user can not like a post with wrong slug')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        like_post_url = reverse('post-like')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        post = Post.objects.first()
+
+        liked_data = {
+            'like': 'like',
+            'post_slug': '7654323'
+        }
+        liked_response = self.client.post(like_post_url, liked_data, format='json')
+        self.assertEqual(liked_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(liked_response.data['liked'], False)
+        self.assertEqual(liked_response.data['message'], 'No post found with provided slug.')
+        print('Done.....')
+
+    def test_user_cannot_like_post_wrong_like_keyword(self):
+        print('Testing user can not like a post without including the `like` or `dislike` keyword')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        like_post_url = reverse('post-like')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        post = Post.objects.first()
+
+        liked_data = {
+            'like': 'li',
+            'post_slug': post.slug
+        }
+        liked_response = self.client.post(like_post_url, liked_data, format='json')
+        self.assertEqual(liked_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(liked_response.data['liked'], False)
+        self.assertEqual(liked_response.data['message'], 'Please post either `like` or `dislike` keyword to like or dislike post.')
+        print('Done.....')
+
+    def test_user_cannot_like_post_no_like_keyword(self):
+        print('Testing user can not like a post without including the like keyword')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        like_post_url = reverse('post-like')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        post = Post.objects.first()
+
+        liked_data = {
+            'post_slug': post.slug
+        }
+        liked_response = self.client.post(like_post_url, liked_data, format='json')
+        self.assertEqual(liked_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(liked_response.data['liked'], False)
+        self.assertEqual(liked_response.data['message'], 'Please post a valid like or dislike keyword to like or dislike post.')
+        print('Done.....')

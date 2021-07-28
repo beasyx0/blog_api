@@ -60,6 +60,7 @@ class UserTestsRead(APITestCase):
 
         bookmark_post_response = post.bookmark(pubid=user2.pub_id)
         self.assertEqual(bookmark_post_response['message'], f'Post {post.slug} bookmarked successfully.')
+        print('Done.....')
 
     def test_post_bookmark_model_method_fails_wrong_user_id(self):
         '''
@@ -91,6 +92,7 @@ class UserTestsRead(APITestCase):
 
         bookmark_post_response = post.bookmark(pubid='3444')
         self.assertEqual(bookmark_post_response['message'], 'No user found with provided id.')
+        print('Done.....')
 
     def test_post_manager_search(self):
         '''
@@ -142,3 +144,4 @@ class UserTestsRead(APITestCase):
         disliked = post.dislikes.dislike(user.pub_id)
         self.assertEqual(disliked['liked'], False)
         self.assertEqual(disliked['message'], f'{user.username} disliked {post.slug} successfully.')
+        print('Done.....')

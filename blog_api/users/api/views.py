@@ -18,7 +18,7 @@ User = get_user_model()
 
 from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer, UserFollowingSerializer, UserFollowersSerializer
 from blog_api.users.models import VerificationCode, PasswordResetCode
-from blog_api.posts.models import Post
+from blog_api.posts.models import Post, Like, DisLike
 from blog_api.posts.api.serializers import PostSerializer
 from blog_api.posts.api.views import get_paginated_queryset
 from blog_api.users.signals import new_registration
@@ -653,14 +653,36 @@ def user_following_posts(request):
     posts = []
 
     for follow in user_following:
-        follow_posts = Post.objects.filter(author=follow.following.id)
+        follow_posts = Post.objects.filter(author=follow.following.id, is_active=True)
         for post in follow_posts:
             posts.append(post)
 
     all_following_posts = get_paginated_queryset(request, posts, PostSerializer)
 
     return all_following_posts
-    
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_follower_posts(request):
+    '''
+    --All user following posts view--
+    ==========================================================================================================
+    Returns all post by those hes following. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user_followers = request.user.followers.all()
+
+    posts = []
+
+    for follow in user_followers:
+        follow_posts = Post.objects.filter(author=follow.user.id, is_active=True)
+        for post in follow_posts:
+            posts.append(post)
+
+    all_followers_posts = get_paginated_queryset(request, posts, PostSerializer)
+
+    return all_followers_posts
 
 
 @api_view(['GET'])
@@ -672,6 +694,48 @@ def user_bookmarks(request):
     Returns all posts a user has bookmarked. Paginates the queryset.
     ==========================================================================================================
     '''
-    user_bookmarks = Post.objects.filter(bookmarks=request.user)
+    user_bookmarks = Post.objects.filter(bookmarks=request.user, is_active=True)
     all_user_bookmarks = get_paginated_queryset(request, user_bookmarks, PostSerializer)
     return all_user_bookmarks
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_likes(request):
+    '''
+    --All posts liked view--
+    ==========================================================================================================
+    Returns all posts liked by a user. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user = request.user
+    user_liked_posts = Like.objects.filter(users=user)
+    liked_posts = []
+    for like in user_liked_posts:
+        if not like.post.is_active:
+            continue
+        liked_posts.append(like.post)
+
+    all_liked_posts = get_paginated_queryset(request, liked_posts, PostSerializer)
+    return all_liked_posts
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_dislikes(request):
+    '''
+    --All posts liked view--
+    ==========================================================================================================
+    Returns all posts liked by a user. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user = request.user
+    user_disliked_posts = DisLike.objects.filter(users=user)
+    disliked_posts = []
+    for dislike in user_disliked_posts:
+        if not dislike.post.is_active:
+            continue
+        disliked_posts.append(dislike.post)
+
+    all_disliked_posts = get_paginated_queryset(request, disliked_posts, PostSerializer)
+    return all_disliked_posts
