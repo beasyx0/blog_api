@@ -83,6 +83,7 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(create_post_response.data['created'], True)
         self.assertEqual(Post.objects.all().count(), 1)
         self.assertEqual(Post.objects.all()[0].title, 'A really cool title for some really cool blog post by a really cool developer.')
+        print('Done.....')
 
     def test_user_cannot_create_post_unauthenticated(self):
         '''
@@ -93,6 +94,7 @@ class PostTestsCreate(APITestCase):
         create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_403_FORBIDDEN)
         self.assertEqual(Post.objects.all().count(), 0)
+        print('Done.....')
 
     def test_user_cannot_create_post_no_content(self):
         '''
@@ -128,6 +130,7 @@ class PostTestsCreate(APITestCase):
         create_post_response = self.client.post(create_post_url, self.blog_post_data_no_content, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
+        print('Done.....')
 
     def test_user_cannot_create_post_no_title(self):
         '''
@@ -163,6 +166,7 @@ class PostTestsCreate(APITestCase):
         create_post_response = self.client.post(create_post_url, self.blog_post_data_no_title, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
+        print('Done.....')
 
     def test_user_cannot_create_post_title_not_8_words(self):
         '''
@@ -197,6 +201,7 @@ class PostTestsCreate(APITestCase):
         create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
+        print('Done.....')
 
     def test_user_cannot_create_post_wrong_next_post_slug(self):
         '''
@@ -232,6 +237,7 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
         self.assertEqual(create_post_response.data['message'], 'No post found with provided next post slug.')
+        print('Done.....')
 
     def test_user_cannot_create_post_wrong_previous_post_slug(self):
         '''
@@ -267,3 +273,57 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
         self.assertEqual(create_post_response.data['message'], 'No post found with provided previous post slug.')
+        print('Done.....')
+
+    def test_user_can_like_post(self):
+        '''
+        Ensure a user can like a post.
+        '''
+        print('Testing user can like a post')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        like_post_url = reverse('post-like')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        post = Post.objects.first()
+
+        liked_data = {
+            'post_slug': post.slug
+        }
+        liked_response = self.client.post(like_post_url, liked_data, format='json')
+        self.assertEqual(liked_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(liked_response.data['liked'], True)
+        self.assertEqual(liked_response.data['message'], self.user_data['username'] + ' liked ' + post.slug + ' successfully.')
+
+        liked_response2 = self.client.post(like_post_url, liked_data, format='json')
+        self.assertEqual(liked_response2.status_code, HTTP_200_OK)
+        self.assertEqual(liked_response2.data['liked'], False)
+        self.assertEqual(liked_response2.data['message'], self.user_data['username'] + ' disliked ' + post.slug + ' successfully.')
+
+        print('Done.....')
+
+# todo: test user can not like post wrong slug

@@ -1,14 +1,16 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import uuid
 from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import Manager, Model, DateTimeField, TextField, CharField, EmailField, IntegerField, \
-                                                        BooleanField,  ForeignKey, ManyToManyField, SlugField, CASCADE, SET_NULL
+                                                        BooleanField,  ForeignKey, ManyToManyField, OneToOneField, SlugField, CASCADE, SET_NULL
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.template.defaultfilters import slugify
 from django.contrib.postgres.search import SearchVectorField
-from django.contrib.postgres.search import SearchVector
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -89,6 +91,8 @@ class Post(BaseModel):
             }
         try:
             user = User.objects.get(pub_id=pubid)
+            if not user.is_active:
+                raise User.DoesNotExist()
         except User.DoesNotExist:
             return {
                 'bookmarked': False,
@@ -116,6 +120,15 @@ class Post(BaseModel):
                 'message': f'Post {self.slug} un-bookmarked successfully.'
             }
 
+    def get_likes_dislikes_count(self):
+        likes_count = self.likes.users.all().count()
+        dislikes_count = self.dislikes.users.all().count()
+        return {
+            'likes_count': likes_count,
+            'dislikes_count': dislikes_count,
+            'score': likes_count - dislikes_count
+        }
+
     def save(self, *args, **kwargs):
         if not self.id:
             self.slug = self._get_unique_slug()
@@ -126,12 +139,64 @@ class Post(BaseModel):
         return self.title
 
 
-# class Like(BaseModel):
-#     user = ForeignKey(User, null=False, on_delete=CASCADE, related_name='likes')
-#     post = ForeignKey(Post, null=False, on_delete=CASCADE, related_name='likes')
+class Like(BaseModel):
+    post = OneToOneField(Post, null=False, on_delete=CASCADE, related_name='likes')
+    users = ManyToManyField(User, related_name='post_likes')
 
-#     def save(self, *args, **kwargs):
-#         pass
+    class Meta:
+        ordering = ['-created_at',]
 
-#     def __str__(self):
-#         return f'{self.user} likes {self.post.title}'
+    def __str__(self):
+        return f'{self.users.all().count()} likes for {self.post.slug}'
+
+    def like(self, pubid):
+        try:
+            user = User.objects.get(pub_id=pubid)
+            if not user.is_active:
+                raise User.DoesNotExist()
+        except User.DoesNotExist:
+            return {
+                'liked': False,
+                'message': 'No user found with provided id.'
+            }
+        if user in self.post.dislikes.users.all():
+            self.post.dislikes.users.remove(user)
+
+        self.users.add(user)
+        self.save()
+        return {
+            'liked': True,
+            'message': f'{user.username} liked {self.post.slug} successfully.'
+        }
+
+
+class DisLike(BaseModel):
+    post = OneToOneField(Post, null=False, on_delete=CASCADE, related_name='dislikes')
+    users = ManyToManyField(User, related_name='post_dislikes')
+
+    class Meta:
+        ordering = ['-created_at',]
+        verbose_name_plural = 'DisLikes'
+
+    def __str__(self):
+        return f'{self.users.all().count()} dislikes for {self.post.slug}'
+
+    def dislike(self, pubid):
+        try:
+            user = User.objects.get(pub_id=pubid)
+            if not user.is_active:
+                raise User.DoesNotExist()
+        except User.DoesNotExist:
+            return {
+                'liked': False,
+                'message': 'No user found with provided id.'
+            }
+        if user in self.post.likes.users.all():
+            self.post.likes.users.remove(user)
+
+        self.users.add(user)
+        self.save()
+        return {
+            'liked': False,
+            'message': f'{user.username} disliked {self.post.slug} successfully.'
+        }

@@ -427,3 +427,61 @@ def post_search(request):
     all_posts = get_paginated_queryset(request, search_results, PostSerializer)
 
     return all_posts
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+def post_like(request):
+    '''
+    --Post like view--
+    ==========================================================================================================
+    :param: str slug (required)
+    1) Checks for slug in request. If no returns 400 and message.
+    2) Attempts to get the post with the provided slug. If no returns 400 and message.
+    3) Gets the current user from request.user.
+    4) Calls like_post() on the user instance. Returns 201 for liked, returns 200 for disliked else 400 and 
+       message.
+    ==========================================================================================================
+    '''
+    post_slug = request.data.get('post_slug', None)  # 1
+    if not post_slug:
+        return Response({
+                'liked': False,
+                'message': 'Please post a valid post slug to like post.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        post = Post.objects.get(slug=post_slug)  # 2
+        if not post.is_active:
+            raise Post.DoesNotExist()
+    except Post.DoesNotExist:
+        return Response({
+                'liked': False,
+                'message': 'No post found with provided slug.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    user = request.user  # 3
+
+    liked = user.like_post(post.slug)  # 4
+    
+    if liked['liked']:
+        return Response({
+                'liked': liked['liked'],
+                'message': liked['message']
+            }, status=HTTP_201_CREATED
+        )
+    else:
+        if liked['message'] == user.username + ' disliked ' + post.slug + ' successfully.':
+            return Response({
+                    'liked': liked['liked'],
+                    'message': liked['message']
+                }, status=HTTP_200_OK
+            )
+        else:
+            return Response({
+                    'liked': liked['liked'],
+                    'message': liked['message']
+                }, status=HTTP_400_BAD_REQUEST
+            )

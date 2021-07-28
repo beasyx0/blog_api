@@ -5,13 +5,13 @@ from django.db.models import Model, Manager, DateTimeField, CharField, EmailFiel
                                                         GenericIPAddressField, ForeignKey, CASCADE, UniqueConstraint
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.urls import reverse
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-from django.contrib.auth.validators import UnicodeUsernameValidator
 
 from blog_api.users.model_validators import validate_username_min_3_letters, validate_username_max_3_special_chars, \
                                                                                             validate_name_no_special_chars
@@ -125,6 +125,28 @@ class User(BaseModel, AbstractUser):
         '''
         from blog_api.posts.models import Post
         return Post.objects.filter(id=self.id).count()
+
+    def like_post(self, slug):
+        '''
+        Like a post for this user.
+        '''
+        from blog_api.posts.models import Post
+        try:
+            post = Post.objects.get(slug=slug)
+            if not post.is_active:
+                raise Post.DoesNotExist()
+        except Post.DoesNotExist:
+            return {
+                'liked': False,
+                'message': 'No post found with provided slug.'
+            }
+
+        if self in post.likes.users.all():
+            disliked = post.dislikes.dislike(self.pub_id)
+            return disliked
+        else:
+            liked = post.likes.like(self.pub_id)
+            return liked
 
     class Meta:
         ordering = ['-created_at',]

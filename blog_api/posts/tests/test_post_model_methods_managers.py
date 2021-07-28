@@ -49,8 +49,8 @@ class UserTestsRead(APITestCase):
                 email=self.user2_data['email'],
                 password=self.user2_data['password']
         )
-        user.is_active = True
-        user.save()
+        user2.is_active = True
+        user2.save()
 
         post = Post.objects.create(
                 author=user,
@@ -60,6 +60,37 @@ class UserTestsRead(APITestCase):
 
         bookmark_post_response = post.bookmark(pubid=user2.pub_id)
         self.assertEqual(bookmark_post_response['message'], f'Post {post.slug} bookmarked successfully.')
+
+    def test_post_bookmark_model_method_fails_wrong_user_id(self):
+        '''
+        Ensure we cant call post.bookmark() on a post instance with wrong user id.
+        '''
+        print('Testing we cant call post.bookmark() on post instance with wrong usr id')
+
+        user = User.objects.create(
+                username=self.user_data['username'],
+                email=self.user_data['email'],
+                password=self.user_data['password']
+        )
+        user.is_active = True
+        user.save()
+
+        user2 = User.objects.create(
+                username=self.user2_data['username'],
+                email=self.user2_data['email'],
+                password=self.user2_data['password']
+        )
+        user2.is_active = True
+        user2.save()
+
+        post = Post.objects.create(
+                author=user,
+                title=self.blog_post_data['title'],
+                content=self.blog_post_data['content']
+            )
+
+        bookmark_post_response = post.bookmark(pubid='3444')
+        self.assertEqual(bookmark_post_response['message'], 'No user found with provided id.')
 
     def test_post_manager_search(self):
         '''
@@ -84,3 +115,30 @@ class UserTestsRead(APITestCase):
         search_term = 'lorem'
         search_results = Post.items.search(search_text=search_term)
         self.assertEqual(len(search_results), 1)
+        print('Done.....')
+
+    def test_like_model_method_like_model(self):
+        '''
+        Ensure we can call Like.like()
+        '''
+        print('Testing we can call like() on a Like instance')
+
+        user = User.objects.create(
+                username=self.user_data['username'],
+                email=self.user_data['email'],
+                password=self.user_data['password']
+        )
+        user.is_active = True
+        user.save()
+
+        post = Post.objects.create(
+                author=user,
+                title=self.blog_post_data['title'],
+                content=self.blog_post_data['content']
+            )
+        liked = post.likes.like(user.pub_id)
+        self.assertEqual(liked['liked'], True)
+        self.assertEqual(liked['message'], f'{user.username} liked {post.slug} successfully.')
+        disliked = post.dislikes.dislike(user.pub_id)
+        self.assertEqual(disliked['liked'], False)
+        self.assertEqual(disliked['message'], f'{user.username} disliked {post.slug} successfully.')

@@ -484,6 +484,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(expired_resend_response.status_code, HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(expired_resend_response.data['message'], 'Verification code sent! Check your email.')
+        verification_code.refresh_from_db()
         self.assertEqual(now_day, verification_code.code_expiration.day)
 
         print('Done.....')
@@ -547,6 +548,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(expired_resend_response.status_code, HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(expired_resend_response.data['message'], 'Password reset link sent! Check your email.')
+        password_reset_code.refresh_from_db()
         self.assertEqual(now_day, password_reset_code.code_expiration.day)
 
         print('Done.....')

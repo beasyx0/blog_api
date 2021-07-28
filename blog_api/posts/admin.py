@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-from blog_api.posts.models import Post
+from blog_api.posts.models import Post, Like, DisLike
 
 
 @admin.register(Post)
@@ -37,3 +37,7 @@ class PostAdmin(admin.ModelAdmin):
         qs = super(PostAdmin, self).get_queryset(request)
         qs = qs.defer('content').prefetch_related('bookmarks').select_related('author').select_related('nextpost').select_related('previouspost')
         return qs
+
+
+admin.site.register(Like)
+admin.site.register(DisLike)
