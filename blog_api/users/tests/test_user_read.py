@@ -71,7 +71,7 @@ class UserTestsRead(APITestCase):
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
-        user_url = reverse('user')
+        user_bookmarks_url = reverse('user-bookmarks')
 
         reg_response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
@@ -97,13 +97,10 @@ class UserTestsRead(APITestCase):
             post.bookmarks.add(user)
             post.save()
 
-        response = self.client.get(user_url)
-        bookmark_count = 0
-        for i in response.data['user']['bookmarks']:
-            bookmark_count += 1
+        response = self.client.get(user_bookmarks_url)
 
         self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(bookmark_count, 10)
+        self.assertEqual(len(response.data['results']), 10)
         self.assertEqual(user.bookmarked_posts.all().count(), 10)
         print('Done.....')
 
@@ -115,7 +112,7 @@ class UserTestsRead(APITestCase):
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
-        user_url = reverse('user')
+        followers_url = reverse('user-followers')
 
         reg_response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
@@ -144,20 +141,21 @@ class UserTestsRead(APITestCase):
         for new_user in new_users:
             UserFollowing.objects.create(user=new_user, following=user)
         
-        response = self.client.get(user_url)
+        response = self.client.get(followers_url)
         self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 10)
         self.assertEqual(user.followers.all().count(), 10)
         print('Done.....')
 
     def test_user_can_get_own_following(self):
         '''
-        Ensure the user can get a list of his own users following.
+        Ensure the user can get a list of his own users hes following.
         '''
         print('Testing user can get users he follows')
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
-        user_url = reverse('user')
+        following_url = reverse('user-following')
 
         reg_response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
@@ -186,8 +184,9 @@ class UserTestsRead(APITestCase):
         for new_user in new_users:
             UserFollowing.objects.create(user=user, following=new_user)
         
-        response = self.client.get(user_url)
+        response = self.client.get(following_url)
         self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 10)
         self.assertEqual(user.following.all().count(), 10)
         print('Done.....')
 
@@ -199,7 +198,7 @@ class UserTestsRead(APITestCase):
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
-        user_url = reverse('user')
+        user_posts_url = reverse('user-posts')
 
         reg_response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
@@ -223,17 +222,12 @@ class UserTestsRead(APITestCase):
         for i in range(10):
             post = Post.objects.create(author=user, title='This is a title', content='This is some contetnt')
         
-        response = self.client.get(user_url)
+        response = self.client.get(user_posts_url)
         self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 10)
         self.assertEqual(user.posts.all().count(), 10)
         print('Done.....')
 
-    # def test_user_cannot_get_user_unauthenticated(self):
-    #     '''
-    #     Ensure an unauthenticated user cannot view his data.
-    #     '''
-    #     response = self.client.get(reverse("user"))
-    #     self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
 
     def test_user_can_get_posts_of_those_he_follows(self):
         '''
@@ -242,7 +236,7 @@ class UserTestsRead(APITestCase):
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
-        user_url = reverse('user')
+        user_following_posts_url = reverse('user-following-posts')
 
         reg_response = self.client.post(register_url, self.user_data, format='json')
         self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
@@ -279,6 +273,7 @@ class UserTestsRead(APITestCase):
                 content=self.blog_post_data['content'] 
         )
 
-        user_response = self.client.get(user_url)
-        self.assertEqual(user_response.status_code, HTTP_200_OK)
-        self.assertEqual(user_response.data['user']['following_posts'][0]['slug'], post.slug)
+        user_following_posts_response = self.client.get(user_following_posts_url)
+        self.assertEqual(user_following_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(user_following_posts_response.data['results']), 1)
+        self.assertEqual(len(user_following_posts_response.data['results']), 1)

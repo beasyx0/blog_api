@@ -115,9 +115,9 @@ class PostTestsUpdate(APITestCase):
             'slug': new_post.slug,
         }
         update_post_response = self.client.put(update_post_url, update_post_data, format='json')
-        self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
-        self.assertEqual(update_post_response.data['updated'], False)
-        self.assertEqual(update_post_response.data['message'], 'You can not update the title.')
+        self.assertEqual(update_post_response.status_code, HTTP_200_OK)
+        self.assertEqual(update_post_response.data['updated'], True)
+        self.assertEqual(update_post_response.data['post']['title'], new_post.title)
 
     def test_user_cannot_update_post_wrong_slug(self):
         print('Testing user can not update a post with wrong slug')
@@ -199,7 +199,7 @@ class PostTestsUpdate(APITestCase):
         update_post_response = self.client.put(update_post_url, update_post_data, format='json')
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
-        self.assertEqual(update_post_response.data['message'], 'Please post a valid next post slug to update post.')
+        self.assertEqual(update_post_response.data['message'], 'No post found with provided next post slug.')
 
     def test_user_cannot_update_post_wrong_previous_post_slug(self):
         print('Testing user can not update a post with wrong previous post slug')
@@ -241,7 +241,7 @@ class PostTestsUpdate(APITestCase):
         update_post_response = self.client.put(update_post_url, update_post_data, format='json')
         self.assertEqual(update_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(update_post_response.data['updated'], False)
-        self.assertEqual(update_post_response.data['message'], 'Please post a valid previous post slug to update post.')
+        self.assertEqual(update_post_response.data['message'], 'No post found with provided previous post slug.')
 
     def test_user_cannot_update_post_previous_post_to_self(self):
         print('Testing user can not update a post with previous post to self.')
@@ -273,7 +273,6 @@ class PostTestsUpdate(APITestCase):
                         title=self.blog_post_data['title'],
                         content=self.blog_post_data['content']
                     )
-
 
         update_post_data = {
             'partial': True,

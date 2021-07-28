@@ -94,38 +94,6 @@ class User(BaseModel, AbstractUser):
                 'message': f'{user_to_follow.username} unfollowed successfully.'
             }
 
-    def get_following(self):
-        '''
-        Return a dictionary of the users a user is following.
-        '''
-        self_followings = self.following.all()
-        following = []
-        for follow in self_followings:
-            following.append({'pub_id': follow.following.pub_id, 'username': follow.following.username})
-        return following
-
-    def get_following_posts(self):
-        '''
-        Get all posts of those the user is following.
-        '''
-        from blog_api.posts.models import Post
-        following_posts = []
-        for follow in self.following.all():
-            posts = Post.objects.filter(author=follow.following)
-            for post in posts:
-                following_posts.append({'slug': post.slug, 'title': post.title})
-        return following_posts
-
-    def get_followers(self):
-        '''
-        Return a dictionary of the users followers.
-        '''
-        self_followerss = self.followers.all()
-        followers= []
-        for follow in self_followerss:
-            followers.append({'pub_id': follow.user.pub_id, 'username': follow.user.username})
-        return followers
-
     def get_following_follower_count(self):
         following_count = self.following.all().count()
         followers_count = self.followers.all().count()
@@ -134,17 +102,6 @@ class User(BaseModel, AbstractUser):
             'followers_count': followers_count
         }
 
-    def get_posts(self):
-        '''
-        Return all posts by this user.
-        '''
-        from blog_api.posts.models import Post  # avoid import errors
-        self_posts = Post.objects.filter(author=self)
-        posts = []
-        for post in self_posts:
-            posts.append({'slug': post.slug, 'title': post.title})
-        return posts
-
     def bookmark_post(self, slug):
         '''
         Bookmarks a post for this user.
@@ -152,6 +109,8 @@ class User(BaseModel, AbstractUser):
         from blog_api.posts.models import Post  # avoid circular imports
         try:
             post_to_bookmark = Post.objects.get(slug=slug)
+            if not post_to_bookmark.is_active:
+                raise Post.DoesNotExist()
         except Post.DoesNotExist:
             return {
                 'bookmarked': False,
@@ -160,16 +119,12 @@ class User(BaseModel, AbstractUser):
         bookmarked = post_to_bookmark.bookmark(pubid=self.pub_id)
         return bookmarked
 
-    def get_self_bookmarks(self):
+    def get_post_count(self):
         '''
-        Return all bookmarked posts for this user
+        Return a count of all posts by this user.
         '''
-        from blog_api.posts.models import Post  # avoid import errors
-        bookmarked_posts = Post.objects.filter(bookmarks__pub_id=self.pub_id)
-        bookmarks = []
-        for post in bookmarked_posts:
-            bookmarks.append({'slug': post.slug, 'title': post.title})
-        return bookmarks
+        from blog_api.posts.models import Post
+        return Post.objects.filter(id=self.id).count()
 
     class Meta:
         ordering = ['-created_at',]
@@ -361,15 +316,3 @@ class UserFollowing(BaseModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super(UserFollowing, self).save(*args, **kwargs)
-
-    # def get_self_user_pub_id(self):
-    #     return self.user.pub_id
-
-    # def get_self_user_username(self):
-    #     return self.user.username
-
-    # def get_self_following_pub_id(self):
-    #     return self.following.pub_id
-
-    # def get_self_following_username(self):
-    #     return self.following.username

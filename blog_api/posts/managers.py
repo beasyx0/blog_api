@@ -26,8 +26,9 @@ class PostQuerySet(models.QuerySet):
         trigram_similarity = TrigramSimilarity('title', search_text)
         return (
             self.filter(search_vector=search_query)
-                # .prefetch_related('tags')
                 .prefetch_related('bookmarks')
+                .select_related('previouspost')
+                .select_related('nextpost')
                 .annotate(rank=search_rank + trigram_similarity)
                 .order_by('-rank')
         )

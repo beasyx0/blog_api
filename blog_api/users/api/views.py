@@ -16,8 +16,11 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer, UpdateUserSerializer
+from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer, UserFollowingSerializer, UserFollowersSerializer
 from blog_api.users.models import VerificationCode, PasswordResetCode
+from blog_api.posts.models import Post
+from blog_api.posts.api.serializers import PostSerializer
+from blog_api.posts.api.views import get_paginated_queryset
 from blog_api.users.signals import new_registration
 from blog_api.users.utils import get_client_ip
 
@@ -428,7 +431,7 @@ def user_update(request):
             }, status=HTTP_400_BAD_REQUEST
         )
     user = request.user
-    serializer = UpdateUserSerializer(user, data=request.data, partial=partial)  # 4
+    serializer = UserSerializer(user, data=request.data, partial=partial)  # 4
 
     if serializer.is_valid():  # 5
         serializer.save()  # 6
@@ -586,3 +589,89 @@ def user_follow(request):
             'message': followed['message']
         }, status=HTTP_200_OK
     )
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_posts(request):
+    '''
+    --All user posts view--
+    ==========================================================================================================
+    Returns nested representations of all posts for this user. Paginates the quereyset.
+    ==========================================================================================================
+    '''
+    posts_to_paginate = \
+        Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost').filter(author=request.user, is_active=True)
+    all_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+
+    return all_posts
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_following(request):
+    '''
+    --All user following view--
+    ==========================================================================================================
+    Returns all users a user is folllowing. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user_followings = request.user.following.all()
+
+    all_followings = get_paginated_queryset(request, user_followings, UserFollowingSerializer)
+
+    return all_followings
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_followers(request):
+    '''
+    --All user followers view--
+    ==========================================================================================================
+    Returns all users that are following him. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user_followers = request.user.followers.all()
+
+    all_followers = get_paginated_queryset(request, user_followers, UserFollowersSerializer)
+
+    return all_followers
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_following_posts(request):
+    '''
+    --All user following posts view--
+    ==========================================================================================================
+    Returns all post by those hes following. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user_following = request.user.following.all()
+
+    posts = []
+
+    for follow in user_following:
+        follow_posts = Post.objects.filter(author=follow.following.id)
+        for post in follow_posts:
+            posts.append(post)
+
+    all_following_posts = get_paginated_queryset(request, posts, PostSerializer)
+
+    return all_following_posts
+    
+
+
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def user_bookmarks(request):
+    '''
+    --All user bookmarked posts--
+    ==========================================================================================================
+    Returns all posts a user has bookmarked. Paginates the queryset.
+    ==========================================================================================================
+    '''
+    user_bookmarks = Post.objects.filter(bookmarks=request.user)
+    all_user_bookmarks = get_paginated_queryset(request, user_bookmarks, PostSerializer)
+    return all_user_bookmarks

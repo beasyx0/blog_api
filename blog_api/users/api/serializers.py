@@ -182,37 +182,20 @@ class RegisterSerializer(ModelSerializer):
 
 
 class UserSerializer(ModelSerializer):
-    posts = SerializerMethodField()
-    following = SerializerMethodField()
-    following_posts = SerializerMethodField()
-    followers = SerializerMethodField()
-    bookmarks = SerializerMethodField()
     follow_counts = SerializerMethodField()
+    post_count = SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'pub_id', 'username', 'name', 'email', 'posts', 'following', 'following_posts', 
-            'followers', 'follow_counts', 'bookmarks', 'date_joined', 
+            'pub_id', 'username', 'name', 'email', 'post_count', 'follow_counts', 'date_joined', 
         ]
 
-    def get_posts(self, obj):
-        return obj.get_posts()
-
-    def get_following(self, obj):
-        return obj.get_following()
-
-    def get_following_posts(self, obj):
-        return obj.get_following_posts()
-
-    def get_followers(self, obj):
-        return obj.get_followers()
+    def get_post_count(self, obj):
+        return obj.get_post_count()
 
     def get_follow_counts(self, obj):
         return obj.get_following_follower_count()
-
-    def get_bookmarks(self, obj):
-        return obj.get_self_bookmarks()
 
 
 class UpdateUserSerializer(ModelSerializer):
@@ -235,3 +218,31 @@ class UpdateUserSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'name',)
+
+
+class UserFollowingSerializer(ModelSerializer):
+
+    following_username = SerializerMethodField()
+
+    class Meta:
+        model = UserFollowing
+        fields = ('following', 'following_username',)
+
+    def get_following_username(self, obj):
+        return obj.following.username
+
+
+class UserFollowersSerializer(ModelSerializer):
+
+    follower = SerializerMethodField()
+    follower_username = SerializerMethodField()
+
+    class Meta:
+        model = UserFollowing
+        fields = ('follower', 'follower_username',)
+
+    def get_follower(self, obj):
+        return obj.user.pub_id
+
+    def get_follower_username(self, obj):
+        return obj.user.username

@@ -180,3 +180,48 @@ class UserTestsRead(APITestCase):
         self.assertEqual(bookmark_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(bookmark_response.data['bookmarked'], False)
         self.assertEqual(bookmark_response.data['message'], 'No post found with provided slug.')
+
+    def test_user_cannot_bookmark_inactive_post(self):
+        print('Testing user can not bookmark inactive post')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        post_create_url = reverse('post-create')
+        bookmark_url = reverse('post-bookmark')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        self.client.post(verification_url, verificaton_data, format='json')
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        new_post_data = {
+            'author': User.objects.first(),
+            'title': self.blog_post_data['title'],
+            'content': self.blog_post_data['content']
+        }
+        new_post_response = self.client.post(post_create_url, self.blog_post_data, format='json')
+        self.assertEqual(new_post_response.status_code, HTTP_201_CREATED)
+
+        post = Post.objects.latest('created_at')
+        post.is_active = False
+        post.save()
+
+        bookmark_data = {
+            'post_to_bookmark': post.slug
+        }
+        bookmark_response = self.client.post(bookmark_url, bookmark_data, format='json')
+        self.assertEqual(bookmark_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(bookmark_response.data['message'], 'No post found with provided slug.')
+

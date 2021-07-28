@@ -15,7 +15,7 @@ class PostAdmin(admin.ModelAdmin):
     list_filter = ('created_at', 'author', 'featured', 'is_active',)
     list_display_links = ('slug',)
     list_editable = ('title', 'author', 'featured', 'is_active',)
-    list_per_page = 50
+    list_per_page = 20
     list_select_related = True
     search_fields = ['title', 'author', 'content',]
     fieldsets = (

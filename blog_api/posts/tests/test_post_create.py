@@ -24,13 +24,20 @@ class PostTestsCreate(APITestCase):
             'password': 'Testing4321@',
             'password2': 'Testing4321@'
         }
+        self.user2_data = {
+            'name': 'DabApps',
+            'username': 'someuser001',
+            'email': 'someemail1@email.com',
+            'password': 'Testing4321@',
+            'password2': 'Testing4321@'
+        }
 
         self.blog_post_data = {
             'title': 'A really cool title for some really cool blog post by a really cool developer.',
             'content': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed facilisis nunc id orci hendrerit, id tempor lorem tincidunt. Praesent id fermentum orci. Proin malesuada est sed nisl aliquam, ac congue nibh sagittis. Vestibulum sed ipsum vulputate, sodales neque auctor, mollis odio. Nullam sit amet mattis ante. Aenean mi sapien, aliquet eget sapien ac, finibus accumsan erat. Donec pretium risus faucibus ultrices egestas. In at aliquam magna. Pellentesque vitae felis est. Sed at augue ipsum. Cras mi nunc, efficitur a malesuada ac, vulputate a mauris. Mauris congue congue dui, eu maximus ante vulputate nec. Vivamus in lorem nec quam ultricies tincidunt ultrices in lectus. Quisque semper posuere libero sit amet tempor. In quis augue quam. Mauris eget risus in ante congue mattis a in est. Duis porta ornare placerat. In lacinia felis metus, ac dignissim est ultrices eu. Aenean nec massa eget mi maximus tempor. In quis leo condimentum, vulputate urna eget, accumsan ex. Vestibulum bibendum ante ac lobortis convallis.',
         }
 
-        self.blog_post_data_no_title_ = {
+        self.blog_post_data_no_title = {
             'title': '',
             'content': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed facilisis nunc id orci hendrerit, id tempor lorem tincidunt. Praesent id fermentum orci. Proin malesuada est sed nisl aliquam, ac congue nibh sagittis. Vestibulum sed ipsum vulputate, sodales neque auctor, mollis odio. Nullam sit amet mattis ante. Aenean mi sapien, aliquet eget sapien ac, finibus accumsan erat. Donec pretium risus faucibus ultrices egestas. In at aliquam magna. Pellentesque vitae felis est. Sed at augue ipsum. Cras mi nunc, efficitur a malesuada ac, vulputate a mauris. Mauris congue congue dui, eu maximus ante vulputate nec. Vivamus in lorem nec quam ultricies tincidunt ultrices in lectus. Quisque semper posuere libero sit amet tempor. In quis augue quam. Mauris eget risus in ante congue mattis a in est. Duis porta ornare placerat. In lacinia felis metus, ac dignissim est ultrices eu. Aenean nec massa eget mi maximus tempor. In quis leo condimentum, vulputate urna eget, accumsan ex. Vestibulum bibendum ante ac lobortis convallis.',
         }
@@ -41,25 +48,35 @@ class PostTestsCreate(APITestCase):
         }
 
     def test_authenticated_user_can_create_new_post(self):
+        '''
+        Ensure a user can create a new post authenticated.
+        '''
         print('Testing authenticated user can create new post')
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
         create_post_url = reverse('post-create')
 
-        response = self.client.post(register_url, self.user_data, format='json')
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
-        self.assertEqual(response.data['registered'], True)
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg2_response = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
 
-        verificaton_data = {
-            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
         }
-        verification_response = self.client.post(verification_url, verificaton_data, format='json')
-        self.assertEqual(verification_response.status_code, HTTP_200_OK)
-        self.assertEqual(verification_response.data['verified'], True)
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
 
-        user = User.objects.latest('created_at')
-        self.client.force_login(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
         
         create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
@@ -68,6 +85,9 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(Post.objects.all()[0].title, 'A really cool title for some really cool blog post by a really cool developer.')
 
     def test_user_cannot_create_post_unauthenticated(self):
+        '''
+        Ensure a user can not create post unauthenticated
+        '''
         print('Testing user cannot create a new post unauthenticated.')
         create_post_url = reverse('post-create')
         create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
@@ -75,52 +95,175 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(Post.objects.all().count(), 0)
 
     def test_user_cannot_create_post_no_content(self):
-        print('Testing authenticated user can create new post')
+        '''
+        Ensure a user cannot create a post with no content.
+        '''
+        print('Testing user can not create post no content')
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
         create_post_url = reverse('post-create')
 
-        response = self.client.post(register_url, self.user_data, format='json')
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
-        self.assertEqual(response.data['registered'], True)
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg2_response = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
 
-        verificaton_data = {
-            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
         }
-        verification_response = self.client.post(verification_url, verificaton_data, format='json')
-        self.assertEqual(verification_response.status_code, HTTP_200_OK)
-        self.assertEqual(verification_response.data['verified'], True)
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
 
-        user = User.objects.latest('created_at')
-        self.client.force_login(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
         
         create_post_response = self.client.post(create_post_url, self.blog_post_data_no_content, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
 
     def test_user_cannot_create_post_no_title(self):
-        print('Testing authenticated user can create new post')
+        '''
+        Ensure a user cannot create a post with no title.
+        '''
+        print('Testing user can not create post with not title')
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
         create_post_url = reverse('post-create')
 
-        response = self.client.post(register_url, self.user_data, format='json')
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
-        self.assertEqual(response.data['registered'], True)
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg2_response = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
 
-        verificaton_data = {
-            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
         }
-        verification_response = self.client.post(verification_url, verificaton_data, format='json')
-        self.assertEqual(verification_response.status_code, HTTP_200_OK)
-        self.assertEqual(verification_response.data['verified'], True)
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
 
-        user = User.objects.latest('created_at')
-        self.client.force_login(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
         
-        create_post_response = self.client.post(create_post_url, self.blog_post_data_no_title_, format='json')
+        create_post_response = self.client.post(create_post_url, self.blog_post_data_no_title, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
 
+    def test_user_cannot_create_post_title_not_8_words(self):
+        '''
+        Ensure a user cannot create a post with the title being less than 8 words.
+        '''
+        print('Testing user can not create post with title less than 8 words')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        
+        self.blog_post_data['title'] = 'This is four words'
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(create_post_response.data['created'], False)
+
+    def test_user_cannot_create_post_wrong_next_post_slug(self):
+        '''
+        Ensure a user cannot create a post with wrong next post slug.
+        '''
+        print('Testing user can not create post with the wrong next post slug')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        
+        self.blog_post_data['next_post'] = 'kllkjlkjkljlkjlkjlkj'
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(create_post_response.data['created'], False)
+        self.assertEqual(create_post_response.data['message'], 'No post found with provided next post slug.')
+
+    def test_user_cannot_create_post_wrong_previous_post_slug(self):
+        '''
+        Ensure a user cannot create a post with wrong previous post slug.
+        '''
+        print('Testing user can not create post with the wrong previous post slug')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        
+        self.blog_post_data['previous_post'] = 'kllkjlkjkljlkjlkjlkj'
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(create_post_response.data['created'], False)
+        self.assertEqual(create_post_response.data['message'], 'No post found with provided previous post slug.')

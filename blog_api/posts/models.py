@@ -82,6 +82,11 @@ class Post(BaseModel):
         '''
         Bookmarks this post with provided user.
         '''
+        if not self.is_active:
+            return {
+                'bookmarked': False,
+                'message': 'Post inactive. Can not bookmark.'
+            }
         try:
             user = User.objects.get(pub_id=pubid)
         except User.DoesNotExist:
@@ -119,3 +124,14 @@ class Post(BaseModel):
 
     def __str__(self):
         return self.title
+
+
+# class Like(BaseModel):
+#     user = ForeignKey(User, null=False, on_delete=CASCADE, related_name='likes')
+#     post = ForeignKey(Post, null=False, on_delete=CASCADE, related_name='likes')
+
+#     def save(self, *args, **kwargs):
+#         pass
+
+#     def __str__(self):
+#         return f'{self.user} likes {self.post.title}'
