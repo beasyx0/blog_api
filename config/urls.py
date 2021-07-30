@@ -5,12 +5,17 @@ from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 
+from blog_api.users.api.views import user_fallback
+
 API_VERSION = 'api/v1/'
 
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
     path(f"{API_VERSION}users/", include('blog_api.users.urls')),
     path(f"{API_VERSION}posts/", include('blog_api.posts.urls')),
+    path(f"{API_VERSION}", user_fallback, name='api-v1-fallback'),
+    path("api/", user_fallback, name='api-fallback'),
+    path('', user_fallback, name='fallback'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 

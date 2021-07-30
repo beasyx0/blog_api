@@ -3,7 +3,7 @@ from datetime import timedelta
 from rest_framework import generics
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
@@ -11,12 +11,13 @@ from rest_framework.throttling import AnonRateThrottle
 from django.db.models import Q, Count, F
 
 from blog_api.posts.models import Tag, Post
-from blog_api.posts.api.serializers import AuthorBookmarkLikedSerializer, PostSerializer, PostUpdateSerializer
+from blog_api.posts.api.serializers import AuthorBookmarkLikedSerializer, NextPostPreviousPostSerializer, TagSerializer, PostSerializer, PostUpdateSerializer
 from blog_api.users.models import User
 
 
-def get_paginated_queryset(request, qs, serializer_obj):
+def get_paginated_queryset(request, qs, serializer_obj, page_size=10):
     paginator = PageNumberPagination()
+    paginator.page_size = page_size
     page = paginator.paginate_queryset(qs, request)
     serializer = serializer_obj(page, many=True, context={'request': request})
     return paginator.get_paginated_response(serializer.data)
@@ -127,6 +128,43 @@ def most_bookmarked_posts(request):
     return most_bookmarked_posts
 
 
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def next_previous_posts(request):
+    '''
+    :param: str updating (required)
+    :param: str post_slug
+    --All next/previous post choices--
+    1) Extract the updating and post_slug keywords from request. If updating is True we leave the post 
+       out of the queryset (no next/previous posts to self)
+    '''
+    updating = request.data.get('updating', None)
+    post_slug = request.data.get('post_slug', None)
+
+    if updating is not None and not post_slug:
+        return Response({
+                    'message': 'Please post a valid post slug if updating else exclude the updating keyword.'
+                }, status=HTTP_400_BAD_REQUEST
+            )
+    if updating and post_slug:
+        try:
+            post = Post.objects.get(slug=post_slug)
+            if not post.is_active:
+                raise Post.DoesNotExist()
+            next_previous_posts_to_paginate = Post.objects.filter(author=request.user, is_active=True).exclude(slug=post_slug)  # if action is update we exclude the post being updated
+        except Post.DoesNotExist:
+            return Response({
+                    'message': 'No post found with provided slug.'
+                }, status=HTTP_400_BAD_REQUEST
+            )
+    else:
+        next_previous_posts_to_paginate = Post.objects.filter(author=request.user, is_active=True)
+
+    all_next_previous_posts = get_paginated_queryset(request, next_previous_posts_to_paginate, NextPostPreviousPostSerializer, page_size=1000)
+
+    return all_next_previous_posts
+
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 def post_create(request):
@@ -197,7 +235,7 @@ def post_create(request):
             new_post.tags.clear()
             new_post.tags.add(*tag_set)
             new_post.save()
-            new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize
+            new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize to get tags
             return Response({
                     'created': True,
                     'post': new_post.data
@@ -406,7 +444,7 @@ def post_bookmarks(request):
         )
 
     bookmarks = post.bookmarks.all()
-    all_post_bookmarks = get_paginated_queryset(request, bookmarks, AuthorBookmarkSerializer)
+    all_post_bookmarks = get_paginated_queryset(request, bookmarks, AuthorBookmarkSerializer, page_size=30)
     return all_post_bookmarks
 
 
@@ -630,7 +668,23 @@ def post_like(request):
 
 
 @api_view(['GET'])
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def all_tags(request):
+    '''
+    --All tags view--
+    ==========================================================================================================
+    Return all tag names and pub_id's.
+    ==========================================================================================================
+    '''
+    tags = Tag.objects.all()
+    all_tags = get_paginated_queryset(request, tags, TagSerializer, page_size=1000)
+    
+    return all_tags
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
 @throttle_classes([AnonRateThrottle])
 def post_likes(request):
     '''
@@ -661,12 +715,12 @@ def post_likes(request):
         )
 
     users_liked = post.likes.users.all()
-    all_users_liked = get_paginated_queryset(request, users_liked, AuthorBookmarkLikedSerializer)
+    all_users_liked = get_paginated_queryset(request, users_liked, AuthorBookmarkLikedSerializer, page_size=30)
     return all_users_liked
 
 
 @api_view(['GET'])
-@permission_classes((IsAuthenticated,))
+@permission_classes((AllowAny,))
 @throttle_classes([AnonRateThrottle])
 def post_dislikes(request):
     '''
@@ -697,5 +751,17 @@ def post_dislikes(request):
         )
 
     users_disliked = post.dislikes.users.all()
-    all_users_disliked = get_paginated_queryset(request, users_disliked, AuthorBookmarkLikedSerializer)
+    all_users_disliked = get_paginated_queryset(request, users_disliked, AuthorBookmarkLikedSerializer, page_size=30)
     return all_users_disliked
+
+
+@api_view(['GET', 'POST', 'PUT', 'PATCH'])
+@permission_classes((AllowAny,))
+def posts_fallback(request):
+    '''
+    Fallback to display a nice message.
+    '''
+    return Response({
+            'message': 'Please no.'
+        }, status=HTTP_403_FORBIDDEN
+    )

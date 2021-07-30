@@ -1,5 +1,6 @@
 from rest_framework.serializers import ModelSerializer, ValidationError, PrimaryKeyRelatedField, SerializerMethodField, CharField
 
+from django.db.models import Q, Count, F
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -27,15 +28,16 @@ class NextPostPreviousPostSerializer(ModelSerializer):
         model = Post
         fields = ['slug', 'title',]
 
-    def to_representation(self, instance):
-        post_slug = instance.slug
-        return post_slug
-
 
 class TagSerializer(ModelSerializer):
+    post_count = SerializerMethodField()
+
     class Meta:
         model = Tag
-        fields = ['pub_id', 'name',]
+        fields = ['pub_id', 'name', 'post_count',]
+
+    def get_post_count(self, obj):
+        return obj.posts.all().count()
 
 
 class PostSerializer(ModelSerializer):

@@ -29,6 +29,11 @@ class PostTestsRead(APITestCase):
             'title': 'A really cool title for some really cool blog post by a really cool developer.',
             'content': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed facilisis nunc id orci hendrerit, id tempor lorem tincidunt. Praesent id fermentum orci. Proin malesuada est sed nisl aliquam, ac congue nibh sagittis. Vestibulum sed ipsum vulputate, sodales neque auctor, mollis odio. Nullam sit amet mattis ante. Aenean mi sapien, aliquet eget sapien ac, finibus accumsan erat. Donec pretium risus faucibus ultrices egestas. In at aliquam magna. Pellentesque vitae felis est. Sed at augue ipsum. Cras mi nunc, efficitur a malesuada ac, vulputate a mauris. Mauris congue congue dui, eu maximus ante vulputate nec. Vivamus in lorem nec quam ultricies tincidunt ultrices in lectus. Quisque semper posuere libero sit amet tempor. In quis augue quam. Mauris eget risus in ante congue mattis a in est. Duis porta ornare placerat. In lacinia felis metus, ac dignissim est ultrices eu. Aenean nec massa eget mi maximus tempor. In quis leo condimentum, vulputate urna eget, accumsan ex. Vestibulum bibendum ante ac lobortis convallis.',
         }
+        self.blog_post_data_with_tags_str = {
+            'title': 'A really cool title for some really cool blog post by a really cool developer.',
+            'content': 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed facilisis nunc id orci hendrerit, id tempor lorem tincidunt. Praesent id fermentum orci. Proin malesuada est sed nisl aliquam, ac congue nibh sagittis. Vestibulum sed ipsum vulputate, sodales neque auctor, mollis odio. Nullam sit amet mattis ante. Aenean mi sapien, aliquet eget sapien ac, finibus accumsan erat. Donec pretium risus faucibus ultrices egestas. In at aliquam magna. Pellentesque vitae felis est. Sed at augue ipsum. Cras mi nunc, efficitur a malesuada ac, vulputate a mauris. Mauris congue congue dui, eu maximus ante vulputate nec. Vivamus in lorem nec quam ultricies tincidunt ultrices in lectus. Quisque semper posuere libero sit amet tempor. In quis augue quam. Mauris eget risus in ante congue mattis a in est. Duis porta ornare placerat. In lacinia felis metus, ac dignissim est ultrices eu. Aenean nec massa eget mi maximus tempor. In quis leo condimentum, vulputate urna eget, accumsan ex. Vestibulum bibendum ante ac lobortis convallis.',
+            'post_tags': 'tag1, tag2, tag3'
+        }
 
     def test_user_can_get_all_posts(self):
         '''
@@ -586,3 +591,80 @@ class PostTestsRead(APITestCase):
         self.assertEqual(most_bookmarked_posts_response.status_code, HTTP_200_OK)
         self.assertEqual(most_bookmarked_posts_response.data['results'][0]['slug'], post1.slug)
         self.assertEqual(len(most_bookmarked_posts_response.data['results']), 1)
+
+    def test_user_can_get_all_tag_choices(self):
+        '''
+        Ensure a user can get all tags choices for frontend create post.
+        '''
+        print('Testing a user can get a list of all tags for frontend create post')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        all_tags_url = reverse('tags')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        
+        create_post_response = self.client.post(create_post_url, self.blog_post_data_with_tags_str, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        all_tags_response = self.client.get(all_tags_url)
+        self.assertEqual(all_tags_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(all_tags_response.data['results']), 3)
+
+    def test_user_can_get_all_next_post_previous_post_choices(self):
+        '''
+        Ensure a user can get all next/previous post choices for frontend create post.
+        '''
+        print('Testing a user can get a list of all next/previous post choices for frontend create post')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        next_previous_choices_url = reverse('post-next-previous')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        
+        for i in range(5):
+            create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+            self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+            self.assertEqual(create_post_response.data['created'], True)
+
+        next_previous_choices_response = self.client.get(next_previous_choices_url)
+        self.assertEqual(next_previous_choices_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(next_previous_choices_response.data['results']), 5)

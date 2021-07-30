@@ -1,8 +1,8 @@
 from django.urls import path
 
 from blog_api.posts.api.views import post_create, post_detail, post_update, post_delete, post_bookmarks, \
-        post_bookmark, post_likes, post_dislikes, post_like, post_search, featured_posts, most_liked_posts, \
-        most_disliked_posts, oldest_posts, most_bookmarked_posts, all_posts
+        post_bookmark, post_likes, post_dislikes, post_like, all_tags, next_previous_posts, post_search, featured_posts, most_liked_posts, \
+        most_disliked_posts, oldest_posts, most_bookmarked_posts, all_posts, posts_fallback
 
 
 urlpatterns = [
@@ -15,6 +15,8 @@ urlpatterns = [
     path('post/likes/', post_likes, name='post-likes'),
     path('post/dislikes/', post_dislikes, name='post-dislikes'),
     path('post/like/', post_like, name='post-like'),
+    path('tags/', all_tags, name='tags'),
+    path('next-previous-posts/', next_previous_posts, name='post-next-previous'),
     path('search/', post_search, name='post-search'),
     path('featured/', featured_posts, name='posts-featured'),
     path('most-liked/', most_liked_posts, name='posts-most-liked'),
@@ -22,4 +24,5 @@ urlpatterns = [
     path('oldest/', oldest_posts, name='posts-oldest'),
     path('most-bookmarked/', most_bookmarked_posts, name='posts-most-bookmarked'),
     path('posts/', all_posts, name='posts'),
+    path('', posts_fallback, name='posts-fallback'),
 ]

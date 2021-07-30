@@ -192,9 +192,11 @@ class Like(BaseModel):
                 'liked': False,
                 'message': 'No user found with provided id.'
             }
+       
         if user in self.post.dislikes.users.all():
             self.post.dislikes.users.remove(user)
             self.post.dislikes_count -= 1
+            self.post.save()
 
         if not user in self.users.all():
             self.users.add(user)
@@ -228,9 +230,11 @@ class DisLike(BaseModel):
                 'liked': False,
                 'message': 'No user found with provided id.'
             }
+        
         if user in self.post.likes.users.all():
             self.post.likes.users.remove(user)
             self.post.likes_count -= 1
+            self.post.save()
 
         if not user in self.users.all():
             self.users.add(user)

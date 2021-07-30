@@ -2,7 +2,7 @@ from django.urls import path
 from blog_api.users.api.views import user_register, user_verify_resend, user_verify, \
     user_login_refresh, user_login, user_logout, user_update, user_delete, user_password_reset_send, user_password_reset, \
     user_follower_posts, user_following_posts, user_followers, user_following, user_follow, user_bookmarks, user_posts, \
-    user_likes, user_dislikes, user
+    user_likes, user_dislikes, user, user_fallback
 
 
 urlpatterns = [
@@ -26,4 +26,5 @@ urlpatterns = [
     path('user/likes/', user_likes, name='user-likes'),
     path('user/dislikes/', user_dislikes, name='user-dislikes'),
     path('user/', user, name='user'),
+    path('', user_fallback, name='user-fallback'),
 ]

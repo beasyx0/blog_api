@@ -3,7 +3,7 @@ from datetime import timedelta
 from rest_framework import generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 from rest_framework.response import Response
 
 from rest_framework_simplejwt.tokens import RefreshToken, OutstandingToken
@@ -618,7 +618,7 @@ def user_following(request):
     '''
     user_followings = request.user.following.all()
 
-    all_followings = get_paginated_queryset(request, user_followings, UserFollowingSerializer)
+    all_followings = get_paginated_queryset(request, user_followings, UserFollowingSerializer, page_size=30)
 
     return all_followings
 
@@ -634,7 +634,7 @@ def user_followers(request):
     '''
     user_followers = request.user.followers.all()
 
-    all_followers = get_paginated_queryset(request, user_followers, UserFollowersSerializer)
+    all_followers = get_paginated_queryset(request, user_followers, UserFollowersSerializer, page_size=30)
 
     return all_followers
 
@@ -739,3 +739,15 @@ def user_dislikes(request):
 
     all_disliked_posts = get_paginated_queryset(request, disliked_posts, PostSerializer)
     return all_disliked_posts
+
+
+@api_view(['GET', 'POST', 'PUT', 'PATCH'])
+@permission_classes((AllowAny,))
+def user_fallback(request):
+    '''
+    Fallback to display a nice message.
+    '''
+    return Response({
+            'message': 'Please no.'
+        }, status=HTTP_403_FORBIDDEN
+    )
