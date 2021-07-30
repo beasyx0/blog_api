@@ -161,6 +161,8 @@ class Post(BaseModel):
         elif self.previouspost:
             if self.previouspost.author != self.author:
                 raise ValidationError({'previouspost': 'Previous post choices limited to author.'})
+
+        self.score = self.likes_count - self.dislikes_count
         
         self.estimated_reading_time = self._get_estimated_reading_time()
         
@@ -192,20 +194,17 @@ class Like(BaseModel):
             }
         if user in self.post.dislikes.users.all():
             self.post.dislikes.users.remove(user)
+            self.post.dislikes_count -= 1
 
-        self.users.add(user)
-        self.save()
+        if not user in self.users.all():
+            self.users.add(user)
+            self.save()
+            self.post.likes_count += 1
+            self.post.save()
         return {
             'liked': True,
             'message': f'{user.username} liked {self.post.slug} successfully.'
         }
-
-    def save(self, *args, **kwargs):
-        if self.id:
-            self.post.likes_count += 1
-            self.post.score += 1
-            self.post.save()
-        return super(Like, self).save(*args, **kwargs)
 
 
 class DisLike(BaseModel):
@@ -231,17 +230,14 @@ class DisLike(BaseModel):
             }
         if user in self.post.likes.users.all():
             self.post.likes.users.remove(user)
+            self.post.likes_count -= 1
 
-        self.users.add(user)
-        self.save()
+        if not user in self.users.all():
+            self.users.add(user)
+            self.save()
+            self.post.dislikes_count += 1
+            self.post.save()
         return {
             'liked': False,
             'message': f'{user.username} disliked {self.post.slug} successfully.'
         }
-
-    def save(self, *args, **kwargs):
-        if self.id:
-            self.post.dislikes_count -= 1
-            self.post.score -= 1
-            self.post.save()
-        return super(DisLike, self).save(*args, **kwargs)
