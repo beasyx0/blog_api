@@ -182,7 +182,6 @@ class RegisterSerializer(ModelSerializer):
 
 
 class UserSerializer(ModelSerializer):
-    post_count = SerializerMethodField()
 
     class Meta:
         model = User
@@ -193,9 +192,6 @@ class UserSerializer(ModelSerializer):
         read_only_fields = [
             'pub_id', 'email', 'post_count', 'following_count', 'followers_count', 'date_joined',
         ]
-
-    def get_post_count(self, obj):
-        return obj.get_post_count()
 
 
 class UserFollowingSerializer(ModelSerializer):

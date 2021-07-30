@@ -127,3 +127,51 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(delete_post_response.data['deleted'], False)
         self.assertEqual(delete_post_response.data['message'], 'You can only delete your own post.')
         print('Done.....')
+
+    def test_users_post_count_decrements_upon_deleting_post(self):
+        print('Testing users post count decrements after deleting a post')
+
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        delete_post_url = reverse('post-delete')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        verification_response = self.client.post(verification_url, verificaton_data, format='json')
+        self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        user = User.objects.first()
+
+        self.blog_post_data['author'] = user.pub_id
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        user.refresh_from_db()
+        self.assertEqual(user.post_count, 1)
+
+        delete_post_data = {
+            'post_to_delete': Post.objects.first().slug
+        }
+        delete_post_response = self.client.post(delete_post_url, delete_post_data, format='json')
+        self.assertEqual(delete_post_response.status_code, HTTP_204_NO_CONTENT)
+
+        user.refresh_from_db()
+        self.assertEqual(user.post_count, 0)
+
+        print('Done.....')

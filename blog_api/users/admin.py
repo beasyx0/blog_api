@@ -23,6 +23,7 @@ class UserAdmin(auth_admin.UserAdmin):
         (_("General"), {"fields": ("pub_id", "ip_address", "username", "password")}),
         (_("Personal info"), {"fields": ("name", "email")}),
         (_("Followers"), {"fields": ("following_count", "followers_count")}),
+        (_("Posts"), {"fields": ("post_count",)}),
         (
             _("Permissions"),
             {
@@ -47,9 +48,9 @@ class UserAdmin(auth_admin.UserAdmin):
             }
         ),
     )
-    list_display = ["pub_id", "username", "email", "is_superuser", "is_active", "following_count", "followers_count",]
+    list_display = ["pub_id", "username", "email", "is_superuser", "is_active", "post_count", "following_count", "followers_count",]
     search_fields = ["name", "email",]
-    readonly_fields = ["pub_id", "created_at", "updated_at", "ip_address", 'followers_count', 'following_count',]
+    readonly_fields = ["pub_id", "created_at", "updated_at", "ip_address", "post_count", "followers_count", "following_count",]
     actions = ['users_set_active_inactive',]
 
     def get_queryset(self, request):

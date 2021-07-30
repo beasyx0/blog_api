@@ -17,6 +17,25 @@ from blog_api.posts.validators import validate_min_8_words
 from blog_api.posts.managers import PostManager, TagManager
 
 
+def update_post_counts(objs):
+    '''
+    Update post count for a list of objects.
+    '''
+    for obj in objs:
+        if hasattr(obj, 'post_count'):
+            obj.post_count = obj.posts.filter(is_active=True).count()
+            obj.save()
+            return {
+                'counts_updated': True,
+                'message': f'{obj._meta.model_name} post count updated successfully.'
+            }
+        else:
+            return {
+                'counts_updated': False,
+                'message': f'{obj._meta.model_name} has no post count attribute.'
+            }
+
+
 class BaseModel(Model):
     '''Base model to subclass.'''
     created_at = DateTimeField(editable=False, null=True)

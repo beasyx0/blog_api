@@ -47,6 +47,7 @@ class User(BaseModel, AbstractUser):
     last_name = None
     is_active = BooleanField(default=False)
     ip_address = GenericIPAddressField(editable=False, blank=True, null=True)
+    post_count = IntegerField(editable=False, default=0)
     followers_count = IntegerField(editable=False, default=0)
     following_count = IntegerField(editable=False, default=0)
 
@@ -123,13 +124,6 @@ class User(BaseModel, AbstractUser):
             }
         bookmarked = post_to_bookmark.bookmark(pubid=self.pub_id)
         return bookmarked
-
-    def get_post_count(self):
-        '''
-        Return a count of all posts by this user.
-        '''
-        from blog_api.posts.models import Post
-        return Post.objects.filter(author=self).count()
 
     def like_post(self, slug, like):
         '''

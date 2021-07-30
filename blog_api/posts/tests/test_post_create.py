@@ -653,3 +653,43 @@ class PostTestsCreate(APITestCase):
         self.blog_post_data['previouspost'] = post1.slug
         create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response2.status_code, HTTP_400_BAD_REQUEST)
+
+    def test_user_post_count_updates_creating_new_post(self):
+        '''
+        Ensure a user's post count gets incremented upon creating a new post
+        '''
+        print('Testing user post count increments upon creating new post.')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        user = User.objects.first()
+        self.assertEqual(user.post_count, 0)
+        
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        user.refresh_from_db()
+        self.assertEqual(user.post_count, 1)
+        print('Done.....')

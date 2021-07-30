@@ -10,17 +10,12 @@ from blog_api.posts.validators import validate_min_8_words
 
 
 class AuthorBookmarkLikedSerializer(ModelSerializer):
-
-    post_count = SerializerMethodField()
     
     class Meta:
         model = User
         fields = [
             'pub_id', 'username', 'following_count', 'followers_count', 'post_count',
         ]
-
-    def get_post_count(self, obj):
-        return obj.get_post_count()
 
 
 class NextPostPreviousPostSerializer(ModelSerializer):

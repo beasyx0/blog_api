@@ -13,6 +13,7 @@ from django.db.models import Q, Count, F
 from blog_api.posts.models import Tag, Post
 from blog_api.posts.api.serializers import AuthorBookmarkLikedSerializer, NextPostPreviousPostSerializer, TagSerializer, PostSerializer, PostUpdateSerializer
 from blog_api.users.models import User
+from blog_api.posts.models import update_post_counts
 
 
 def get_paginated_queryset(request, qs, serializer_obj, page_size=10):
@@ -184,8 +185,9 @@ def post_create(request):
     3) Grab the corresponding primary ids for next and previous posts and adds them to the request.
         If not found or if post is inactive returns 400 and message.
     4) Serialize and attempt to save the serializer. If error returns serializer.errors.
-    5) If any post tags were included in the request, adds them to the new post the pulls the new post from 
-       the database to reserialize. Returns 201 and message.
+    5) If any post tags were included in the request, adds them to the new post.
+    6) Updates any objects with a post count attribute.
+    7) Returns serialized post.
     ==========================================================================================================
     '''
     title = request.data.get('title', None)
@@ -230,20 +232,18 @@ def post_create(request):
     if serializer.is_valid():
         serializer.save()
 
+        new_post = Post.objects.get(slug=serializer.data['slug'])
+
         if post_tags:
-            new_post = Post.objects.get(slug=serializer.data['slug'])  # 5
             new_post.tags.clear()
-            new_post.tags.add(*tag_set)
+            new_post.tags.add(*tag_set)  # 5
             new_post.save()
-            new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize to get tags
-            return Response({
-                    'created': True,
-                    'post': new_post.data
-                }, status=HTTP_201_CREATED
-            )
+            
+        update_post_counts([new_post.author])  # 6
+        new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize to get tags if any
         return Response({
                 'created': True,
-                'post': serializer.data
+                'post': new_post.data  # 7
             }, status=HTTP_201_CREATED
         )
     else:
@@ -314,6 +314,9 @@ def post_update(request):
        not to self.
     6) Serializes the request data.
     7) Attempts to save the PostUpdateSerializer. Returns 200 and message. If errors returns 400 and message.
+    8) If any post tags were included in the request, adds them to the post.
+    9) Updates any objects with a post count attribute.
+    10) Returns serialized post.
     ==========================================================================================================
     '''
     partial = request.data.get('partial', False)
@@ -391,21 +394,19 @@ def post_update(request):
     if serializer.is_valid():  # 7
         serializer.save()
 
+        updated_post = Post.objects.get(slug=serializer.data['slug'])
+
         if post_tags:
-            new_post = Post.objects.get(slug=serializer.data['slug'])  # 5
-            new_post.tags.clear()
-            new_post.tags.add(*tag_set)
-            new_post.save()
-            new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize
-            return Response({
-                    'updated': True,
-                    'post': new_post.data
-                }, status=HTTP_200_OK
-            )
+            updated_post.tags.clear()
+            updated_post.tags.add(*tag_set)  # 8
+            updated_post.save()
+            
+        update_post_counts([updated_post.author])  # 9
+        updated_post = PostSerializer(updated_post)  # serializer was already saved, have to reserialize to get tags if any
         return Response({
                 'updated': True,
                 'message': 'Post updated successfully.',
-                'post': serializer.data
+                'post': updated_post.data  # 10
             }, status=HTTP_200_OK
         )
     else:
@@ -544,6 +545,8 @@ def post_delete(request):
 
     post.is_active = False
     post.save()
+
+    update_post_counts([post.author])
 
     return Response({
             'deleted': True,
