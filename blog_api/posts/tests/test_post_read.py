@@ -482,3 +482,107 @@ class PostTestsRead(APITestCase):
         oldest_posts_response = self.client.get(oldest_posts_url)
         self.assertEqual(oldest_posts_response.status_code, HTTP_200_OK)
         self.assertEqual(len(oldest_posts_response.data['results']), 1)
+
+    def test_user_can_get_most_bookmarked_posts(self):
+        '''
+        Ensure a user can get all posts in order by most bookmarked.
+        '''
+        print('Testing user can get all posts by most bookmarked')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        most_bookmarked_posts_url = reverse('posts-most-bookmarked')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        user = User.objects.first()
+
+        post1.bookmarks.add(user)
+        post1.save()
+
+        most_bookmarked_posts_response = self.client.get(most_bookmarked_posts_url)
+        self.assertEqual(most_bookmarked_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(most_bookmarked_posts_response.data['results'][0]['slug'], post1.slug)
+
+    def test_user_can_get_most_bookmarked_posts_only_active(self):
+        '''
+        Ensure a user can get all posts in order by most bookmarked only active
+        '''
+        print('Testing user can get all posts by most bookmarked only active')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        most_bookmarked_posts_url = reverse('posts-most-bookmarked')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        post1 = Post.objects.first()
+        post2 = Post.objects.last()
+
+        user = User.objects.first()
+
+        post1.bookmarks.add(user)
+        post1.save()
+
+        post2.is_active = False
+        post2.save()
+
+        most_bookmarked_posts_response = self.client.get(most_bookmarked_posts_url)
+        self.assertEqual(most_bookmarked_posts_response.status_code, HTTP_200_OK)
+        self.assertEqual(most_bookmarked_posts_response.data['results'][0]['slug'], post1.slug)
+        self.assertEqual(len(most_bookmarked_posts_response.data['results']), 1)

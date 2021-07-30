@@ -2,7 +2,7 @@ from django.urls import path
 
 from blog_api.posts.api.views import post_create, post_detail, post_update, post_delete, post_bookmarks, \
         post_bookmark, post_likes, post_dislikes, post_like, post_search, featured_posts, most_liked_posts, \
-        most_disliked_posts, oldest_posts, all_posts
+        most_disliked_posts, oldest_posts, most_bookmarked_posts, all_posts
 
 
 urlpatterns = [
@@ -17,8 +17,9 @@ urlpatterns = [
     path('post/like/', post_like, name='post-like'),
     path('search/', post_search, name='post-search'),
     path('featured/', featured_posts, name='posts-featured'),
-    path('liked/top/', most_liked_posts, name='posts-most-liked'),
-    path('disliked/top/', most_disliked_posts, name='posts-most-disliked'),
+    path('most-liked/', most_liked_posts, name='posts-most-liked'),
+    path('most-disliked/', most_disliked_posts, name='posts-most-disliked'),
     path('oldest/', oldest_posts, name='posts-oldest'),
+    path('most-bookmarked/', most_bookmarked_posts, name='posts-most-bookmarked'),
     path('posts/', all_posts, name='posts'),
 ]

@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 
 
-def validate_username_min_3_letters(value):
+def validate_min_3_characters(value):
     letters = [l for l in value if l.isalpha()]
     if len(letters) < 3:
         raise ValidationError(
@@ -10,7 +10,7 @@ def validate_username_min_3_letters(value):
         )
 
 
-def validate_username_max_3_special_chars(value):
+def validate_3_special_characters_max(value):
         special_character_count = 0
         for char in value:
             if not char.isalnum():
@@ -23,7 +23,7 @@ def validate_username_max_3_special_chars(value):
             )
 
 
-def validate_name_no_special_chars(value):
+def validate_no_special_chars(value):
     if any(not c.isalnum() for c in value if not c == ' '):
         raise ValidationError(
             'Your name must have no special characters e.g. @/./+/-/_ ',

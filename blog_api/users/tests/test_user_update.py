@@ -53,7 +53,7 @@ class UserTestsUpdate(APITestCase):
         '''
         Ensure a user can update his username only.
         '''
-        print('Testing user can update name')
+        print('Testing user can update username only')
         register_url = reverse('user-register')
         response = self.client.post(register_url, self.user_data, format='json')
         user = User.objects.latest('created_at')
@@ -74,7 +74,7 @@ class UserTestsUpdate(APITestCase):
         '''
         Ensure a user can update his name only.
         '''
-        print('Testing user can update name')
+        print('Testing user can update name only')
         register_url = reverse('user-register')
         response = self.client.post(register_url, self.user_data, format='json')
         user = User.objects.latest('created_at')
@@ -84,27 +84,6 @@ class UserTestsUpdate(APITestCase):
         update_url = reverse('user-update')
         update_data = {
             'name': 'DrSuess',
-            'partial': True
-        }
-        update_response = self.client.put(update_url, update_data, format='json')
-        self.assertEqual(update_response.status_code, HTTP_200_OK)
-        self.assertEqual(update_response.data['updated'], True)
-        print('Done.....')
-
-    def test_user_can_update_username_only(self):
-        '''
-        Ensure a user can update his name only.
-        '''
-        print('Testing user can update name')
-        register_url = reverse('user-register')
-        response = self.client.post(register_url, self.user_data, format='json')
-        user = User.objects.latest('created_at')
-        vcode = VerificationCode.objects.latest('created_at')
-        vcode.verify()
-        self.client.force_login(user=user)
-        update_url = reverse('user-update')
-        update_data = {
-            'username': 'DrSuess',
             'partial': True
         }
         update_response = self.client.put(update_url, update_data, format='json')

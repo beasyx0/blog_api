@@ -1,6 +1,3 @@
-import logging
-logger = logging.getLogger(__name__)
-
 import uuid
 from datetime import timedelta
 
@@ -15,7 +12,9 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-from blog_api.posts.managers import PostManager
+from blog_api.users.model_validators import validate_min_3_characters, validate_no_special_chars
+from blog_api.posts.validators import validate_min_8_words
+from blog_api.posts.managers import PostManager, TagManager
 
 
 class BaseModel(Model):
@@ -33,12 +32,41 @@ class BaseModel(Model):
         return super(BaseModel, self).save(*args, **kwargs)
 
 
+class Tag(BaseModel):
+    '''
+    Tag model.
+    '''
+    pub_id = CharField(editable=False, unique=True, max_length=50, null=True)
+    name = CharField(
+        blank=False, null=False, max_length=30, unique=True, 
+        validators=[validate_no_special_chars, validate_min_3_characters]
+    )
+
+    objects = Manager()
+    items = TagManager()
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        '''
+        --User model save method--
+        1) Sets self.pub_id to UUID hex on first save.
+        '''
+        if not self.id:
+            self.pub_id = str(uuid.uuid4().hex)
+        return super(Tag, self).save(*args, **kwargs)
+
+
 class Post(BaseModel):
     '''
     Blog Post Model.
     '''
     slug = SlugField(editable=False, max_length=255, unique=True)
-    title = CharField(max_length=255, blank=False, null=False)
+    title = CharField(max_length=255, blank=False, null=False, validators=[validate_min_8_words])
     author = ForeignKey(User, on_delete=SET_NULL, null=True, related_name='posts')
     featured = BooleanField(default=False)
     estimated_reading_time = IntegerField(default=0, editable=False)
@@ -51,6 +79,7 @@ class Post(BaseModel):
     likes_count = IntegerField(editable=False, default=0)
     dislikes_count = IntegerField(editable=False, default=0)
     score = IntegerField(editable=False, default=0)
+    tags = ManyToManyField(Tag, related_name='posts', blank=True)
 
     objects = Manager()
     items = PostManager()
@@ -126,7 +155,15 @@ class Post(BaseModel):
     def save(self, *args, **kwargs):
         if not self.id:
             self.slug = self._get_unique_slug()
+        if self.nextpost:
+            if self.nextpost.author != self.author:
+                raise ValidationError({'nextpost': 'Next post choices limited to author.'})
+        elif self.previouspost:
+            if self.previouspost.author != self.author:
+                raise ValidationError({'previouspost': 'Previous post choices limited to author.'})
+        
         self.estimated_reading_time = self._get_estimated_reading_time()
+        
         return super(Post, self).save(*args, **kwargs)
 
     def __str__(self):

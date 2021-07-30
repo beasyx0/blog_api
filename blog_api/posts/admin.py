@@ -5,13 +5,13 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-from blog_api.posts.models import Post, Like, DisLike
+from blog_api.posts.models import Tag, Post, Like, DisLike
 
 
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
-    list_display = ('slug', 'created_at', 'updated_at', 'title', 'author', 'estimated_reading_time', 'featured', 'is_active',)
+    list_display = ('slug', 'created_at', 'updated_at', 'title', 'author', 'featured', 'is_active', 'score',)
     list_filter = ('created_at', 'author', 'featured', 'is_active',)
     list_display_links = ('slug',)
     list_editable = ('title', 'author', 'featured', 'is_active',)
@@ -24,14 +24,15 @@ class PostAdmin(admin.ModelAdmin):
                     'created_at', 'updated_at', 'slug', 
                     'title', 'author', 'content', 
                     'bookmarks', 'previouspost', 'nextpost', 
-                    'estimated_reading_time', 
-                    'featured', 'is_active',
+                    'estimated_reading_time', 'featured', 
+                    'is_active', 'likes_count', 'dislikes_count',
+                    'score', 'tags',
                 ),
                 'classes': ('wide', 'extrapretty'),
             }),
         )
-    filter_horizontal = ['bookmarks',]
-    readonly_fields = ('created_at', 'updated_at', 'slug', 'estimated_reading_time',)
+    filter_horizontal = ['bookmarks', 'tags',]
+    readonly_fields = ('created_at', 'updated_at', 'slug', 'estimated_reading_time', 'likes_count', 'dislikes_count', 'score',)
 
     def get_queryset(self, request):
         qs = super(PostAdmin, self).get_queryset(request)
@@ -39,5 +40,6 @@ class PostAdmin(admin.ModelAdmin):
         return qs
 
 
+admin.site.register(Tag)
 admin.site.register(Like)
 admin.site.register(DisLike)

@@ -11,7 +11,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.validators import UnicodeUsernameValidator
 
-from blog_api.users.model_validators import validate_username_max_3_special_chars, validate_name_no_special_chars
+from blog_api.users.model_validators import validate_3_special_characters_max, validate_no_special_chars
 
 from blog_api.users.models import UserFollowing
 from blog_api.posts.models import Post
@@ -132,7 +132,7 @@ class RegisterSerializer(ModelSerializer):
     username = CharField(
         required=True, 
         validators=[
-            validate_username_max_3_special_chars,
+            validate_3_special_characters_max,
             UnicodeUsernameValidator(), 
             UniqueValidator(queryset=User.objects.all())
         ]
@@ -142,7 +142,7 @@ class RegisterSerializer(ModelSerializer):
         allow_null=True, 
         max_length=255, 
         required=False, 
-        validators=[validate_name_no_special_chars]
+        validators=[validate_no_special_chars]
     )
     email = EmailField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
     password = CharField(write_only=True, required=True, validators=[validate_password])

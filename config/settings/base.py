@@ -70,7 +70,6 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
-    "crispy_forms",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",

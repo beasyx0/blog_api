@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 from blog_api.users.models import VerificationCode
-from blog_api.posts.models import Post
-from blog_api.posts.validators import validate_title_min_8_words
+from blog_api.posts.models import Tag, Post
+from blog_api.posts.validators import validate_min_8_words
 
 
 class AuthorBookmarkLikedSerializer(ModelSerializer):
@@ -32,14 +32,15 @@ class NextPostPreviousPostSerializer(ModelSerializer):
         return post_slug
 
 
+class TagSerializer(ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['pub_id', 'name',]
+
+
 class PostSerializer(ModelSerializer):
 
     author = PrimaryKeyRelatedField(allow_null=True, queryset=User.objects.all(), required=False)
-
-    title = CharField(
-        max_length=255,
-        validators=[validate_title_min_8_words,]
-        )
 
     nextpost = \
         PrimaryKeyRelatedField(
@@ -54,6 +55,8 @@ class PostSerializer(ModelSerializer):
                                     .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
     )
 
+    tags = TagSerializer(many=True, read_only=True)
+
     class Meta:
         model = Post
         fields = [
@@ -61,7 +64,7 @@ class PostSerializer(ModelSerializer):
             'estimated_reading_time', 'content', 
             'previouspost', 'nextpost', 'created_at', 
             'updated_at', 'likes_count', 'dislikes_count', 
-            'score',
+            'score', 'tags',
         ]
         read_only_fields = [
             'slug', 'estimated_reading_time', 'likes_count', 'dislikes_count', 'score', 

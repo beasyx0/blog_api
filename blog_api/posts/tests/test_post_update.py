@@ -41,7 +41,7 @@ class PostTestsUpdate(APITestCase):
         '''
         Ensure a user can update a post while authenticated
         '''
-        print('Testing authenticated user can create new post')
+        print('Testing authenticated user can update a post')
 
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
@@ -80,6 +80,55 @@ class PostTestsUpdate(APITestCase):
         self.assertEqual(update_post_response.data['updated'], True)
         self.assertEqual(update_post_response.data['message'], 'Post updated successfully.')
         self.assertEqual(update_post_response.data['post']['content'], 'Lorem ipsum dolor sit amet, Praesent id fermentum orci.')
+        print('Done.....')
+
+    def test_authenticated_user_can_update_post_with_tags(self):
+        '''
+        Ensure a user can update a post with tags
+        '''
+        print('Testing authenticated user can update a post with tags')
+
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        update_post_url = reverse('post-update')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        verificaton_data = {
+            'verification_code': VerificationCode.objects.latest('created_at').verification_code
+        }
+        self.client.post(verification_url, verificaton_data, format='json')
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        new_post_slug = Post.objects.create(
+                            author=User.objects.get(email=self.user_data['email']),
+                            title=self.blog_post_data['title'],
+                            content=self.blog_post_data['content']).slug
+
+        update_post_data = {
+            'partial': True,
+            'slug': new_post_slug,
+            'content': 'Lorem ipsum dolor sit amet, Praesent id fermentum orci.',
+            'post_tags': 'tag1, tag2, tag3'
+        }
+        update_post_response = self.client.put(update_post_url, update_post_data, format='json')
+        self.assertEqual(update_post_response.status_code, HTTP_200_OK)
+        self.assertEqual(update_post_response.data['updated'], True)
+
+        post = Post.objects.first()
+
+        self.assertEqual(len(post.tags.all()), 3)
+        self.assertEqual(post.tags.all()[0].name, 'tag1')
         print('Done.....')
 
     def test_user_cannot_update_post_title(self):

@@ -10,9 +10,8 @@ from rest_framework.throttling import AnonRateThrottle
 
 from django.db.models import Q, Count, F
 
-from blog_api.posts.models import Post
+from blog_api.posts.models import Tag, Post
 from blog_api.posts.api.serializers import AuthorBookmarkLikedSerializer, PostSerializer, PostUpdateSerializer
-from blog_api.posts.api.permissions import PostIsOwnerOrReadOnly
 from blog_api.users.models import User
 
 
@@ -53,10 +52,7 @@ def featured_posts(request):
     Returns nested representations of all posts that are featured. Paginates the queryset.
     ==========================================================================================================
     '''
-    featured_posts_to_paginate = \
-        Post.objects.prefetch_related('bookmarks')\
-                        .select_related('previouspost').select_related('nextpost')\
-                        .filter(is_active=True, featured=True)
+    featured_posts_to_paginate = Post.items.featured()
 
     featured_posts = get_paginated_queryset(request, featured_posts_to_paginate, PostSerializer)
 
@@ -73,12 +69,7 @@ def most_liked_posts(request):
     Returns nested representations of all posts by most liked. Paginates the queryset.
     ==========================================================================================================
     '''
-    most_liked_posts_to_paginate = \
-        Post.objects.prefetch_related('bookmarks')\
-                    .select_related('previouspost')\
-                    .select_related('nextpost')\
-                    .filter(is_active=True)\
-                    .order_by('-score')
+    most_liked_posts_to_paginate = Post.items.most_liked()
 
     most_liked_posts = get_paginated_queryset(request, most_liked_posts_to_paginate, PostSerializer)
 
@@ -95,12 +86,7 @@ def most_disliked_posts(request):
     Returns nested representations of all posts by most disliked. Paginates the queryset.
     ==========================================================================================================
     '''
-    most_disliked_posts_to_paginate = \
-        Post.objects.prefetch_related('bookmarks')\
-                        .select_related('previouspost')\
-                        .select_related('nextpost')\
-                        .filter(is_active=True)\
-                        .order_by('score')
+    most_disliked_posts_to_paginate = Post.items.most_disliked()
 
     most_disliked_posts = get_paginated_queryset(request, most_disliked_posts_to_paginate, PostSerializer)
 
@@ -117,14 +103,28 @@ def oldest_posts(request):
     Returns nested representations of all posts by oldest. Paginates the quereyset.
     ==========================================================================================================
     '''
-    posts_to_paginate = \
-        Post.objects.prefetch_related('bookmarks')\
-                    .select_related('previouspost').select_related('nextpost')\
-                    .filter(is_active=True).order_by('created_at')
+    posts_to_paginate = Post.items.oldest_posts()
 
     oldest_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
 
     return oldest_posts
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def most_bookmarked_posts(request):
+    '''
+    --Most bookmarked posts view--
+    ==========================================================================================================
+    Returns nested representations of all posts by most bookmarked. Paginates the quereyset.
+    ==========================================================================================================
+    '''
+    posts_to_paginate = Post.items.most_bookmarked()
+
+    most_bookmarked_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+
+    return most_bookmarked_posts
 
 
 @api_view(['POST'])
@@ -145,7 +145,9 @@ def post_create(request):
     2) Set the current user as the author in request.
     3) Grab the corresponding primary ids for next and previous posts and adds them to the request.
         If not found or if post is inactive returns 400 and message.
-    4) Serialize and attempt to save the serializer. Returns 200 or serializer.errors.
+    4) Serialize and attempt to save the serializer. If error returns serializer.errors.
+    5) If any post tags were included in the request, adds them to the new post the pulls the new post from 
+       the database to reserialize. Returns 201 and message.
     ==========================================================================================================
     '''
     title = request.data.get('title', None)
@@ -153,6 +155,7 @@ def post_create(request):
     next_post_slug = request.data.get('next_post', None)
     previous_post_slug = request.data.get('previous_post', None)  # 1
     featured = request.data.get('featured', None)
+    post_tags = request.data.get('post_tags', None)
 
     request.data['author'] = request.user.id  # 2
 
@@ -182,12 +185,27 @@ def post_create(request):
                 }, status=HTTP_400_BAD_REQUEST
             )
 
+    if post_tags:
+        tag_set = Tag.items.comma_to_qs(post_tags)
+    
     serializer = PostSerializer(data=request.data)  # 4
     if serializer.is_valid():
         serializer.save()
+
+        if post_tags:
+            new_post = Post.objects.get(slug=serializer.data['slug'])  # 5
+            new_post.tags.clear()
+            new_post.tags.add(*tag_set)
+            new_post.save()
+            new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize
+            return Response({
+                    'created': True,
+                    'post': new_post.data
+                }, status=HTTP_201_CREATED
+            )
         return Response({
                 'created': True,
-                'posts': serializer.data
+                'post': serializer.data
             }, status=HTTP_201_CREATED
         )
     else:
@@ -264,6 +282,7 @@ def post_update(request):
     title = request.data.get('title', None)
     next_post_slug = request.data.get('next_post', None)
     previous_post_slug = request.data.get('previous_post', None)  # 1
+    post_tags = request.data.get('post_tags', None)
 
 
     post_slug = request.data.get('slug', None)
@@ -289,7 +308,8 @@ def post_update(request):
         return Response({
                 'updated': False,
                 'message': 'You can only update your own post.'  # 4
-            }, status=HTTP_400_BAD_REQUEST)
+            }, status=HTTP_400_BAD_REQUEST
+        )
 
     if next_post_slug:
         try:
@@ -325,10 +345,25 @@ def post_update(request):
                 }, status=HTTP_400_BAD_REQUEST
             )
 
+    if post_tags:
+        tag_set = Tag.items.comma_to_qs(post_tags)
+
     serializer = PostUpdateSerializer(post, data=request.data, partial=partial)  # 6
 
     if serializer.is_valid():  # 7
         serializer.save()
+
+        if post_tags:
+            new_post = Post.objects.get(slug=serializer.data['slug'])  # 5
+            new_post.tags.clear()
+            new_post.tags.add(*tag_set)
+            new_post.save()
+            new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize
+            return Response({
+                    'updated': True,
+                    'post': new_post.data
+                }, status=HTTP_200_OK
+            )
         return Response({
                 'updated': True,
                 'message': 'Post updated successfully.',
