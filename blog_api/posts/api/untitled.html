@@ -1,0 +1,92 @@
+register:
+http post 127.0.0.1:8000/api/v1/users/user/register/ username='someuser1' email='someuser1@email.com' password='Testing4321!' password2='Testing4321!'
+
+verify:
+http post 127.0.0.1:8000/api/v1/users/user/verify/ verification_code='1fd7d9e7035e4e9bbd0bc4f62f8ff4de'
+
+login:
+http post 127.0.0.1:8000/api/v1/users/user/login/ email='admin@email.com' password='Testing4321!'
+
+update:
+http put 127.0.0.1:8000/api/v1/users/user/update/ username='billy@oe' 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NTA3MjE4LCJqdGkiOiIyMDliYzgwNjNiMmQ0NGI4YTFlYjllMDY5MzE1NmE2NiIsInVzZXJfcHViX2lkIjoiNGRjNWQ3NjAzM2QxNDJhZmE2ODcyNTcyNDBiNjllODQifQ.GWvd0q1tCbt7VHkyovxUCCltHZgBmwa6sJrQX56EUI0'
+
+get user:
+http get 127.0.0.1:8000/api/v1/users/user/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NjgwNDM4LCJqdGkiOiJjNzA0M2I5NjIwNjc0NTU3YjNmNzJmNDdiOTZlMzQ0MCIsInVzZXJfcHViX2lkIjoiMjk1MzI4ZGZmM2FhNDFjZWJhNjA3YTFhYmI5ODM4ODYifQ.HD2gPEuogBauz-txIlUHXNeDrepN_MilG3oKwUk4gWs'
+
+get user posts:
+http get 127.0.0.1:8000/api/v1/users/user/posts/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDA3MTI0LCJqdGkiOiIxNzRmN2Q5NTAyYWQ0YTRlYmM4NDA0Y2M5ZWJkMmM3YyIsInVzZXJfcHViX2lkIjoiYmYzOTYxMDFmYTkwNDE4OWIxYWU2MTBkYWFlNDMyMzAifQ.HHU7PJtXMFw5dpBZaEOwpdURcuf04O9BiNz4AR4DicA'
+
+get user following:
+http 127.0.0.1:8000/api/v1/users/user/following/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NjU4ODUyLCJqdGkiOiJhZmFiZWRjNmQ5OGI0YjZkYTIyZDBiYWI0ZGMwMjJmOCIsInVzZXJfcHViX2lkIjoiY2I4ZmQ1NmM0NTUzNGVkNTllOTAyOTVlZTMxN2ZmYzAifQ.II97cR_mTE4ikG09EF8_jqoAS1OE6-mIL5B2GjFYZhY'
+
+get user followers:
+http 127.0.0.1:8000/api/v1/users/user/followers/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDExNDc0LCJqdGkiOiIwMmU4YmY3MDI2OGI0OWY5YjBmMmEzNGRlNzI2ZWI5YSIsInVzZXJfcHViX2lkIjoiYmYzOTYxMDFmYTkwNDE4OWIxYWU2MTBkYWFlNDMyMzAifQ.a8mZQak3hqBHxd_JXsrgE0vB1zc6aKe5mYAwObCA5YE'
+
+get usr following posts:
+http 127.0.0.1:8000/api/v1/users/user/following/posts/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDg4OTkzLCJqdGkiOiI0MDY2MDI4OTliMTk0ZTcyYmU3ZTUzMmYxY2Y3NGI5NSIsInVzZXJfcHViX2lkIjoiZmExOTQyOTk3MmYzNDVkMzhkMTc0MTM3N2NkZDJiZGQifQ.Hp3jFeRcqh7kUTBes9_mBzT6z4_i9VLe1NjezknatRA'
+
+get usr follower posts:
+http 127.0.0.1:8000/api/v1/users/user/follower/posts/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDg4OTkzLCJqdGkiOiI0MDY2MDI4OTliMTk0ZTcyYmU3ZTUzMmYxY2Y3NGI5NSIsInVzZXJfcHViX2lkIjoiZmExOTQyOTk3MmYzNDVkMzhkMTc0MTM3N2NkZDJiZGQifQ.Hp3jFeRcqh7kUTBes9_mBzT6z4_i9VLe1NjezknatRA'
+
+get user bookmarks:
+http 127.0.0.1:8000/api/v1/users/user/bookmarks/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDMxNzk4LCJqdGkiOiIwZTU4MzU1NzlmMDU0MjUxYTViZmY3ZjdkNmM1ZTkyMiIsInVzZXJfcHViX2lkIjoiYzVhNTViNzRhOGNhNDg1NjhiZjAxN2RjNDY2ZTVkZTYifQ.d5aJKIs4zJFHfgWPBEihQgIgI6AITwLPpUcOaj_5mB4'
+
+get user liked posts:
+http 127.0.0.1:8000/api/v1/users/user/likes/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDk1NzAyLCJqdGkiOiIzNjk5Y2M1MDQ1Mjg0Mzc4YmVjNDFmMGRjNGI2NDAzZCIsInVzZXJfcHViX2lkIjoiNGRjNWQ3NjAzM2QxNDJhZmE2ODcyNTcyNDBiNjllODQifQ.5ZSqecL2ursC-0_EYlLfqtlzBZmab3Pt_shBVpZ1r74'
+
+get posts:
+http get 127.0.0.1:8000/api/v1/posts/posts/
+
+get featured posts:
+http get 127.0.0.1:8000/api/v1/posts/featured/
+
+get most liked:
+http get 127.0.0.1:8000/api/v1/posts/most-liked/
+
+get most disliked:
+http get 127.0.0.1:8000/api/v1/posts/disliked/top/
+
+get oldest posts:
+http get 127.0.0.1:8000/api/v1/posts/oldest/
+
+get most bookmarked:
+http 127.0.0.1:8000/api/v1/posts/most-bookmarked/
+
+create post:
+http post 127.0.0.1:8000/api/v1/posts/post/create/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NzU4MzI1LCJqdGkiOiIwMDY3ZjZjNzY2YzQ0MThjOTEyMzI2YzBiYTZhMTFhZCIsInVzZXJfcHViX2lkIjoiMDMzNTY5YmVmNmNkNDI0Njk0NzA2ZDc3ZWIwNTExMzYifQ.RpDzGtlosdxldRN32zH4rmO3lL6faM4HkvfYzXZ4rLs' title='This is a title longer than 8 words' content='this is some content' featured=True post_tags='dilhhhdo'
+
+post detail:
+http get 127.0.0.1:8000/api/v1/posts/post/detail/ post_slug='this-is-title-22ccafb6e64e4acf85041492c6487c0c'
+
+post update:
+http put 127.0.0.1:8000/api/v1/posts/post/update/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NzU4Mzg2LCJqdGkiOiJmOWJlYjM5ZjRiMGM0ODIzYjNjNzQ0MjQ4MjczMWZiYiIsInVzZXJfcHViX2lkIjoiMDMzNTY5YmVmNmNkNDI0Njk0NzA2ZDc3ZWIwNTExMzYifQ.4IXxrHRr8Pgb_3xkgZzHgcp6AkbTV_2XEDvhJXTz_DE' content='this is some content' slug='this-is-a-title-longer-than-8-words-fbbff7a9acd04fa2a2aefe54894357fe' post_tags='dilhhhdo'
+
+get all post bookmark users:
+http get 127.0.0.1:8000/api/v1/posts/post/bookmarks/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDEwOTU2LCJqdGkiOiI0N2NiMGM5MzM3NzQ0Yzc2YWM1OTg0NjM0MDllNzI2MiIsInVzZXJfcHViX2lkIjoiYmYzOTYxMDFmYTkwNDE4OWIxYWU2MTBkYWFlNDMyMzAifQ.rFbo0ZcedOJ4GUrdxHrZGRmx-83N6uz3O50PippIWVY' post_slug='this-isi-a-title-63f50635c6c3400fa7eee56dc1e44e30'
+
+bookmark:
+http post 127.0.0.1:8000/api/v1/posts/post/bookmark/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDEwOTU2LCJqdGkiOiI0N2NiMGM5MzM3NzQ0Yzc2YWM1OTg0NjM0MDllNzI2MiIsInVzZXJfcHViX2lkIjoiYmYzOTYxMDFmYTkwNDE4OWIxYWU2MTBkYWFlNDMyMzAifQ.rFbo0ZcedOJ4GUrdxHrZGRmx-83N6uz3O50PippIWVY' post_to_bookmark='this-isi-a-title-63f50635c6c3400fa7eee56dc1e44e30'
+
+follow:
+http post 127.0.0.1:8000/api/v1/users/user/follow/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NjU4MDExLCJqdGkiOiI0MGMwNzc1NThjMmY0ZGRiYmVhZjY5YjkxZDNhMmQ1MiIsInVzZXJfcHViX2lkIjoiY2I4ZmQ1NmM0NTUzNGVkNTllOTAyOTVlZTMxN2ZmYzAifQ.jfolyB_EYt7kSqhpK4LdlxCsKl34Ku968S5vYtZp2ic' follow_pub_id='e3da64568c604366862f3b93d5f552d3'
+
+post delete:
+http post 127.0.0.1:8000/api/v1/posts/post/delete/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3Njk3OTY3LCJqdGkiOiIyNzc0ZDhkMjBkZmM0NDMzOGM4YTAzYmFkMzk3ZDg3OCIsInVzZXJfcHViX2lkIjoiMzcyYTFkNzVmMWU5NGM5ODkxMDc5ZTQyM2FhZmIzZmYifQ.QK3ktmD-hs13dDDUCOWdxSxEIP-Oct0J3Pn2meBJfew' post_to_delete='this-is-a-title-longer-than-8-words-a20c92962af44b268bddf3310d4388a9'
+
+search posts:
+http 127.0.0.1:8000/api/v1/posts/all-posts/search/ search_term='lorem ipsum'
+
+post likes:
+http get 127.0.0.1:8000/api/v1/posts/post/likes/ post_slug='lorem-ipsum-dolor-sit-amet-consectetur-adipiscing-elit-pellentesque-at-ornare-arcu-bc308f2642fc43e6abcc5b9b4a45af8e'
+
+post dislikes:
+http get 127.0.0.1:8000/api/v1/posts/post/dislikes/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NDgxNTM3LCJqdGkiOiJhMDVjNzI1NGQ5YjU0MjUzYjk2NjA0YjAxY2I5M2I5ZSIsInVzZXJfcHViX2lkIjoiYzc3MjdmMDQzMTQ4NGJlYTlmNDA3NDVlOWFmOGFkNGYifQ.i5sRaJYxhJvqU40k2QOsXB7kXekOxLL4_v-oIaKaaPs' post_slug='lorem-ipsum-dolor-sit-amet-consectetur-adipiscing-elit-pellentesque-at-ornare-arcu-09f471ee39a64ff8b803ff0890d2438a'
+
+like_post:
+http post 127.0.0.1:8000/api/v1/posts/post/like/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NjU2NTc5LCJqdGkiOiJkNTIwYTFkYmM5YTI0Nzg2OTkwM2RhYjJlZGM2NjM2NyIsInVzZXJfcHViX2lkIjoiYTAxNWViNDY1YTY0NDA4MWJlNGVmYjZmMzI5YmIxYjYifQ.dIwfLRfD_Z_4O3xXdM8AxtZKedzzjk9f1iq9gG-Xqos' post_slug='lorem-ipsum-dolor-sit-amet-consectetur-adipiscing-elit-pellentesque-at-ornare-arcu-bc308f2642fc43e6abcc5b9b4a45af8e' like='like'
+
+all_tags:
+http get 127.0.0.1:8000/api/v1/posts/tags/
+
+next previous posts:
+http get 127.0.0.1:8000/api/v1/posts/next-previous-posts/ 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjI3NjY3MTIzLCJqdGkiOiJhNWFmOGQyZjYwYjY0YzUzYWEyOWI0Y2QwNTY0OGYyMCIsInVzZXJfcHViX2lkIjoiYjQwMTFlMWQ3YTFiNDA5ODg0YThhMTE0NmM5NjI5YTgifQ.u9UCNUc6fT9dS1paLMGi4uWdHu-nPsMsdahdFFRIpdY' updating=True post_slug='lorem-ipsum-dolor-sit-amet-consectetur-adipiscing-elit-pellentesque-at-ornare-arcu-e7995fe68af5431a9702f1e2688b0ea4'

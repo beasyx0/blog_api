@@ -1,8 +1,8 @@
 from django.urls import path
 
 from blog_api.posts.api.views import post_create, post_detail, post_update, post_delete, post_bookmarks, \
-        post_bookmark, post_likes, post_dislikes, post_like, all_tags, next_previous_posts, post_search, featured_posts, most_liked_posts, \
-        most_disliked_posts, oldest_posts, most_bookmarked_posts, all_posts, posts_fallback
+        post_bookmark, post_likes, post_dislikes, post_like, all_tags, all_tags_by_post_count, all_tag_posts, next_previous_posts, post_search, \
+        featured_posts, most_liked_posts, most_disliked_posts, oldest_posts, most_bookmarked_posts, all_posts, posts_fallback
 
 
 urlpatterns = [
@@ -16,6 +16,8 @@ urlpatterns = [
     path('post/dislikes/', post_dislikes, name='post-dislikes'),
     path('post/like/', post_like, name='post-like'),
     path('tags/', all_tags, name='tags'),
+    path('tags/by-post-count/', all_tags_by_post_count, name='tags-by-post-count'),
+    path('tags/tag/posts/', all_tag_posts, name='tag-posts'),
     path('next-previous-posts/', next_previous_posts, name='post-next-previous'),
     path('search/', post_search, name='post-search'),
     path('featured/', featured_posts, name='posts-featured'),

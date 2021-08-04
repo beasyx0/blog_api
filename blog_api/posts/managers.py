@@ -20,51 +20,71 @@ class PostQuerySet(models.QuerySet):
             )
         )
         search_query = SearchQuery(
-            search_text, config='english'
+            search_text, config='english',
+
         )
         search_rank = SearchRank(search_vectors, search_query)
         trigram_similarity = TrigramSimilarity('title', search_text)
         return (
             self.filter(search_vector=search_query, is_active=True)
-                .prefetch_related('bookmarks')
+                .select_related('author')
                 .select_related('previouspost')
                 .select_related('nextpost')
                 .annotate(rank=search_rank + trigram_similarity)
                 .order_by('-rank')
         )
     def featured(self):
-        return self.prefetch_related('bookmarks')\
-                    .select_related('previouspost')\
-                    .select_related('nextpost')\
-                    .filter(is_active=True, featured=True)
+        return (
+            self.prefetch_related('bookmarks')
+                .prefetch_related('tags')
+                .select_related('author')
+                .select_related('previouspost')
+                .select_related('nextpost')
+                .filter(is_active=True, featured=True)
+        )
 
     def most_liked(self):
-        return self.prefetch_related('bookmarks')\
-                    .select_related('previouspost')\
-                    .select_related('nextpost')\
-                    .filter(is_active=True)\
-                    .order_by('-score')
+        return (
+            self.prefetch_related('bookmarks')
+                .prefetch_related('tags')
+                .select_related('author')
+                .select_related('previouspost')
+                .select_related('nextpost')
+                .filter(is_active=True)
+                .order_by('-score')
+        )
 
     def most_disliked(self):
-        return self.prefetch_related('bookmarks')\
-                    .select_related('previouspost')\
-                    .select_related('nextpost')\
-                    .filter(is_active=True)\
-                    .order_by('score')
+        return (
+            self.prefetch_related('bookmarks')
+                .prefetch_related('tags')
+                .select_related('author')
+                .select_related('previouspost')
+                .select_related('nextpost')
+                .filter(is_active=True)
+                .order_by('score')
+        )
 
     def oldest_posts(self):
-        return self.prefetch_related('bookmarks')\
-                    .select_related('previouspost').select_related('nextpost')\
-                    .filter(is_active=True).order_by('created_at')
+        return (
+            self.prefetch_related('bookmarks')
+                .prefetch_related('tags')
+                .select_related('author')
+                .select_related('previouspost')
+                .select_related('nextpost')
+                .filter(is_active=True).order_by('created_at')
+        )
 
     def most_bookmarked(self):
-        return self.prefetch_related('bookmarks')\
-                    .select_related('previouspost').select_related('nextpost')\
-                    .filter(is_active=True)\
-                    .annotate(bookmark_count=Count(F('bookmarks')))\
-                    .order_by('-bookmark_count')
-
-
+        return (
+            self.prefetch_related('bookmarks')
+                .prefetch_related('tags')
+                .select_related('author')
+                .select_related('previouspost').select_related('nextpost')
+                .filter(is_active=True)
+                .annotate(bookmark_count=Count(F('bookmarks')))
+                .order_by('-bookmark_count')
+        )
 
 class PostManager(models.Manager):
 
@@ -90,7 +110,16 @@ class PostManager(models.Manager):
         return self.get_queryset().most_bookmarked()
 
 
+class TagQuerySet(models.QuerySet):
+
+    def highest_post_count(self):
+        return self.annotate(posts_total=Count(F('posts'))).order_by('-posts_total')
+
+
 class TagManager(models.Manager):
+
+    def get_queryset(self):
+        return TagQuerySet(self.model, using=self._db)
 
     def create_or_new(self, name):
         name = name.strip()
@@ -98,7 +127,6 @@ class TagManager(models.Manager):
         if qs.exists():
             return qs.first(), False
         return self.get_queryset().create(name=name), True
-
 
     def comma_to_qs(self, tag_str):
         final_ids = []
@@ -108,9 +136,5 @@ class TagManager(models.Manager):
         qs = self.get_queryset().filter(id__in=final_ids).distinct()
         return qs
 
-
-# tag_qs = Tag.items.comma_to_qs(tag_str)
-
-# instance.tags.clear()
-# instance.tags.add(*tag_qs)
-# instance.save()
+    def highest_post_count(self):
+        return self.get_queryset().highest_post_count()

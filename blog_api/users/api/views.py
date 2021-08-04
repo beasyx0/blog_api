@@ -16,10 +16,10 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer, UserFollowingSerializer, UserFollowersSerializer
+from blog_api.users.api.serializers import TokenObtainPairSerializer, RegisterSerializer, UserSerializer, UserPublicSerializer, UserFollowingSerializer
 from blog_api.users.models import VerificationCode, PasswordResetCode
 from blog_api.posts.models import Post, Like, DisLike
-from blog_api.posts.api.serializers import PostSerializer
+from blog_api.posts.api.serializers import PostOverviewSerializer
 from blog_api.posts.api.views import get_paginated_queryset
 from blog_api.users.signals import new_registration
 from blog_api.users.utils import get_client_ip
@@ -48,25 +48,32 @@ def user_register(request):
     user_email_exists = User.objects.filter(email=user_desired_email).exists()  # 1
     
     user_desired_username = request.data.get('username', None)
-    username_exists = User.objects.filter(username=user_desired_username).exists()
+    user_username_exists = User.objects.filter(username=user_desired_username).exists()
 
-    if any([user_email_exists, username_exists]):
+    if any([user_email_exists, user_username_exists]):
         try:
             user = User.objects.get(email=user_desired_email)
         except User.DoesNotExist:
             user = User.objects.get(username=user_desired_username)  # one of them exists
 
-        verification = user.verification_codes.latest('created_at').send_user_verification_email()
-        if verification['verification_sent']:
-            return Response({
-                    'registered': False,
-                    'message': 'A user with those credentials already exists and is inactive. ' + verification['message']
-                }, status=HTTP_400_BAD_REQUEST
-            )
+        if user.email == user_desired_email:
+            verification = user.verification_codes.latest('created_at').send_user_verification_email()
+            if verification['verification_sent']:
+                return Response({
+                        'registered': False,
+                        'message': 'A user with those credentials already exists and is inactive. ' + verification['message']
+                    }, status=HTTP_400_BAD_REQUEST
+                )
+            else:
+                return Response({
+                        'registered': False,
+                        'message': verification['message']
+                    }, status=HTTP_400_BAD_REQUEST
+                )
         else:
             return Response({
                     'registered': False,
-                    'message': verification['message']
+                    'message': 'A user with that username already exists. Please try again.'
                 }, status=HTTP_400_BAD_REQUEST
             )
 
@@ -518,28 +525,33 @@ def user(request):
     :returns: User serialized.
     :returns: Response.HTTP_STATUS_CODE.
     1) Attempts to get the user_pub_id from request. If no sets to None.
-    2) If no user_pub_id in request sets request.user as user.
-    3) Attempts to get the user with provided user_pub_id. If no returns 400.
-    4) Serialize and returns the user.
+    2) Attempts to get and return the user with the provided id. Returns 200 and message else 400 and 
+       message.
+    3) If no pub_id in request serializes request.user and returns 200.
     ==========================================================================================================
     '''
     user_pub_id = request.data.get('user_pub_id', None)  # 1
 
-    if not user_pub_id:
-        user = request.user  # 2
-    else:
+    if user_pub_id:
         try:
-            user = User.objects.get(pub_id=user_pub_id)  # 3
+            user = User.objects.get(pub_id=user_pub_id)  # 2
         except User.DoesNotExist:
             return Response({
                     'message': 'No user found with provided user id.'
                 }, status=HTTP_400_BAD_REQUEST
             )
-    serialized_user = UserSerializer(user).data  # 4
+        serialized_user = UserPublicSerializer(user).data
+        return Response({
+                    'user': serialized_user 
+                }, status=HTTP_200_OK
+            )
+
+    user = request.user
+    serialized_user = UserSerializer(user).data  # 3
     return Response({
-                'user': serialized_user 
-            }, status=HTTP_200_OK
-        )
+            'user': serialized_user 
+        }, status=HTTP_200_OK
+    )
 
 
 @api_view(['POST'])
@@ -602,7 +614,7 @@ def user_posts(request):
     '''
     posts_to_paginate = \
         Post.objects.prefetch_related('bookmarks').select_related('previouspost').select_related('nextpost').filter(author=request.user, is_active=True)
-    all_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+    all_posts = get_paginated_queryset(request, posts_to_paginate, PostOverviewSerializer)
 
     return all_posts
 
@@ -634,7 +646,7 @@ def user_followers(request):
     '''
     user_followers = request.user.followers.all()
 
-    all_followers = get_paginated_queryset(request, user_followers, UserFollowersSerializer, page_size=30)
+    all_followers = get_paginated_queryset(request, user_followers, UserFollowingSerializer, page_size=30)
 
     return all_followers
 
@@ -657,7 +669,7 @@ def user_following_posts(request):
         for post in follow_posts:
             posts.append(post)
 
-    all_following_posts = get_paginated_queryset(request, posts, PostSerializer)
+    all_following_posts = get_paginated_queryset(request, posts, PostOverviewSerializer)
 
     return all_following_posts
 
@@ -680,7 +692,7 @@ def user_follower_posts(request):
         for post in follow_posts:
             posts.append(post)
 
-    all_followers_posts = get_paginated_queryset(request, posts, PostSerializer)
+    all_followers_posts = get_paginated_queryset(request, posts, PostOverviewSerializer)
 
     return all_followers_posts
 
@@ -695,7 +707,7 @@ def user_bookmarks(request):
     ==========================================================================================================
     '''
     user_bookmarks = Post.objects.filter(bookmarks=request.user, is_active=True)
-    all_user_bookmarks = get_paginated_queryset(request, user_bookmarks, PostSerializer)
+    all_user_bookmarks = get_paginated_queryset(request, user_bookmarks, PostOverviewSerializer)
     return all_user_bookmarks
 
 
@@ -716,7 +728,7 @@ def user_likes(request):
             continue
         liked_posts.append(like.post)
 
-    all_liked_posts = get_paginated_queryset(request, liked_posts, PostSerializer)
+    all_liked_posts = get_paginated_queryset(request, liked_posts, PostOverviewSerializer)
     return all_liked_posts
 
 
@@ -737,7 +749,7 @@ def user_dislikes(request):
             continue
         disliked_posts.append(dislike.post)
 
-    all_disliked_posts = get_paginated_queryset(request, disliked_posts, PostSerializer)
+    all_disliked_posts = get_paginated_queryset(request, disliked_posts, PostOverviewSerializer)
     return all_disliked_posts
 
 

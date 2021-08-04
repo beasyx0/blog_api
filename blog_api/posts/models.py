@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db.models import Manager, Model, DateTimeField, TextField, CharField, EmailField, IntegerField, \
                                                         BooleanField,  ForeignKey, ManyToManyField, OneToOneField, SlugField, CASCADE, SET_NULL
 from django.core.exceptions import ValidationError
+from django.core.validators import MinLengthValidator
 from django.utils import timezone
 from django.template.defaultfilters import slugify
 from django.contrib.postgres.search import SearchVectorField
@@ -15,25 +16,6 @@ User = get_user_model()
 from blog_api.users.model_validators import validate_min_3_characters, validate_no_special_chars
 from blog_api.posts.validators import validate_min_8_words
 from blog_api.posts.managers import PostManager, TagManager
-
-
-def update_post_counts(objs):
-    '''
-    Update post count for a list of objects.
-    '''
-    for obj in objs:
-        if hasattr(obj, 'post_count'):
-            obj.post_count = obj.posts.filter(is_active=True).count()
-            obj.save()
-            return {
-                'counts_updated': True,
-                'message': f'{obj._meta.model_name} post count updated successfully.'
-            }
-        else:
-            return {
-                'counts_updated': False,
-                'message': f'{obj._meta.model_name} has no post count attribute.'
-            }
 
 
 class BaseModel(Model):
@@ -70,6 +52,9 @@ class Tag(BaseModel):
     def __str__(self):
         return self.name
 
+    def get_post_count(self):
+        return self.posts.filter(is_active=True).count()
+
     def save(self, *args, **kwargs):
         '''
         --User model save method--
@@ -89,16 +74,14 @@ class Post(BaseModel):
     author = ForeignKey(User, on_delete=SET_NULL, null=True, related_name='posts')
     featured = BooleanField(default=False)
     estimated_reading_time = IntegerField(default=0, editable=False)
-    content = TextField(blank=False, null=False)
+    content = TextField(blank=False, null=False, validators=[MinLengthValidator(300)])
     bookmarks = ManyToManyField(User, related_name='bookmarked_posts', blank=True)
     previouspost = ForeignKey('self', related_name='previous_post', on_delete=SET_NULL, blank=True, null=True)
     nextpost = ForeignKey('self', related_name='next_post', on_delete=SET_NULL, blank=True, null=True)
     is_active = BooleanField(default=True)
     search_vector = SearchVectorField(editable=False, null=True)
-    likes_count = IntegerField(editable=False, default=0)
-    dislikes_count = IntegerField(editable=False, default=0)
-    score = IntegerField(editable=False, default=0)
     tags = ManyToManyField(Tag, related_name='posts', blank=True)
+    score = IntegerField(editable=False, default=0)
 
     objects = Manager()
     items = PostManager()
@@ -110,6 +93,9 @@ class Post(BaseModel):
 
     def __str__(self):
         return self.title
+
+    def get_overview(self):
+        return self.content[:300]
 
     def _get_estimated_reading_time(self):
         content_string = self.content.strip()
@@ -171,18 +157,46 @@ class Post(BaseModel):
                 'message': f'Post {self.slug} un-bookmarked successfully.'
             }
 
+    def get_bookmark_count(self):
+        return self.bookmarks.all().count()
+
+    def get_likes_count(self):
+        return self.likes.users.all().count()
+
+    def get_dislikes_count(self):
+        return self.dislikes.users.all().count()
+
+    def get_like_score(self):
+        return self.get_likes_count() - self.get_dislikes_count()
+
+    def set_like_score(self):
+        try:
+            self.score = self.get_likes_count() - self.get_dislikes_count()
+            self.save()
+        except (Post.likes.RelatedObjectDoesNotExist, Post.dislikes.RelatedObjectDoesNotExist):
+            self.score = 0
+            self.save()
+
     def save(self, *args, **kwargs):
         if not self.id:
             self.slug = self._get_unique_slug()
+
         if self.nextpost:
             if self.nextpost.author != self.author:
                 raise ValidationError({'nextpost': 'Next post choices limited to author.'})
-        elif self.previouspost:
+
+        if self.previouspost:
             if self.previouspost.author != self.author:
                 raise ValidationError({'previouspost': 'Previous post choices limited to author.'})
 
-        self.score = self.likes_count - self.dislikes_count
-        
+        if self.nextpost and self.previouspost:
+            if self.previouspost.slug == self.nextpost.slug:
+                raise ValidationError({
+                    'nextpost': 'Next post and previous post can not be same.',
+                    'previouspost': 'Previous post and next post can not be same.'
+                    }
+                )
+
         self.estimated_reading_time = self._get_estimated_reading_time()
         
         return super(Post, self).save(*args, **kwargs)
@@ -214,14 +228,13 @@ class Like(BaseModel):
        
         if user in self.post.dislikes.users.all():
             self.post.dislikes.users.remove(user)
-            self.post.dislikes_count -= 1
             self.post.save()
 
         if not user in self.users.all():
             self.users.add(user)
             self.save()
-            self.post.likes_count += 1
-            self.post.save()
+
+        self.post.set_like_score()
         return {
             'liked': True,
             'message': f'{user.username} liked {self.post.slug} successfully.'
@@ -252,14 +265,13 @@ class DisLike(BaseModel):
         
         if user in self.post.likes.users.all():
             self.post.likes.users.remove(user)
-            self.post.likes_count -= 1
             self.post.save()
 
         if not user in self.users.all():
             self.users.add(user)
             self.save()
-            self.post.dislikes_count += 1
-            self.post.save()
+
+        self.post.set_like_score()
         return {
             'liked': False,
             'message': f'{user.username} disliked {self.post.slug} successfully.'

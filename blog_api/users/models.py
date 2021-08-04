@@ -47,9 +47,6 @@ class User(BaseModel, AbstractUser):
     last_name = None
     is_active = BooleanField(default=False)
     ip_address = GenericIPAddressField(editable=False, blank=True, null=True)
-    post_count = IntegerField(editable=False, default=0)
-    followers_count = IntegerField(editable=False, default=0)
-    following_count = IntegerField(editable=False, default=0)
 
     def password_reset(self, password):
         try:
@@ -87,10 +84,10 @@ class User(BaseModel, AbstractUser):
         
         if not UserFollowing.objects.filter(user=self, following=user_to_follow).exists():
             follow = UserFollowing.objects.create(user=self, following=user_to_follow)
-            follow.following.followers_count += 1
-            follow.following.save()
-            self.following_count += 1
-            self.save()
+            # follow.following.followers_count += 1
+            # follow.following.save()
+            # self.following_count += 1
+            # self.save()
             return {
                 'followed': True,
                 'message': f'{user_to_follow.username} followed successfully.'
@@ -98,15 +95,21 @@ class User(BaseModel, AbstractUser):
         
         else:
             follow = UserFollowing.objects.get(user=self, following=user_to_follow)
-            follow.following.followers_count -= 1
-            follow.following.save()
+            # follow.following.followers_count -= 1
+            # follow.following.save()
             follow.delete()
-            self.following_count -= 1
-            self.save()
+            # self.following_count -= 1
+            # self.save()
             return {
                 'followed': False,
                 'message': f'{user_to_follow.username} unfollowed successfully.'
             }
+
+    def get_following_count(self):
+        return self.following.all().count()
+
+    def get_followers_count(self):
+        return self.followers.all().count()
 
     def bookmark_post(self, slug):
         '''
@@ -147,15 +150,20 @@ class User(BaseModel, AbstractUser):
 
         if like == 'like':
             liked = post.likes.like(self.pub_id)
+            post.set_like_score()
             return liked
         elif like == 'dislike':
             disliked = post.dislikes.dislike(self.pub_id)
+            post.set_like_score()
             return disliked
         else:
             return {
                 'liked': False,
                 'message': 'Please include either `like` or `dislike` to like or dislike post.'
             }
+
+    def get_post_count(self):
+        return self.posts.filter(is_active=True).count()
 
     class Meta:
         ordering = ['-created_at',]

@@ -440,6 +440,8 @@ class PostTestsRead(APITestCase):
         self.assertEqual(oldest_posts_response.status_code, HTTP_200_OK)
         self.assertEqual(oldest_posts_response.data['results'][0]['slug'], post1.slug)
 
+        print('Done.....')
+
     def test_user_can_get_oldest_posts_only_active(self):
         '''
         Ensure a user can get all posts in order by oldest only active posts
@@ -487,6 +489,8 @@ class PostTestsRead(APITestCase):
         oldest_posts_response = self.client.get(oldest_posts_url)
         self.assertEqual(oldest_posts_response.status_code, HTTP_200_OK)
         self.assertEqual(len(oldest_posts_response.data['results']), 1)
+
+        print('Done.....')
 
     def test_user_can_get_most_bookmarked_posts(self):
         '''
@@ -537,6 +541,8 @@ class PostTestsRead(APITestCase):
         most_bookmarked_posts_response = self.client.get(most_bookmarked_posts_url)
         self.assertEqual(most_bookmarked_posts_response.status_code, HTTP_200_OK)
         self.assertEqual(most_bookmarked_posts_response.data['results'][0]['slug'], post1.slug)
+
+        print('Done.....')
 
     def test_user_can_get_most_bookmarked_posts_only_active(self):
         '''
@@ -592,6 +598,8 @@ class PostTestsRead(APITestCase):
         self.assertEqual(most_bookmarked_posts_response.data['results'][0]['slug'], post1.slug)
         self.assertEqual(len(most_bookmarked_posts_response.data['results']), 1)
 
+        print('Done.....')
+
     def test_user_can_get_all_tag_choices(self):
         '''
         Ensure a user can get all tags choices for frontend create post.
@@ -629,6 +637,54 @@ class PostTestsRead(APITestCase):
         all_tags_response = self.client.get(all_tags_url)
         self.assertEqual(all_tags_response.status_code, HTTP_200_OK)
         self.assertEqual(len(all_tags_response.data['results']), 3)
+
+        print('Done.....')
+
+    def test_user_can_get_all_tag_choices_by_post_count(self):
+        '''
+        Ensure a user can get all tags choices by post count.
+        '''
+        print('Testing a user can get a list of all tags by post count')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+        all_tags_by_post_count_url = reverse('tags-by-post-count')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+        
+        create_post_response = self.client.post(create_post_url, self.blog_post_data_with_tags_str, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response.data['created'], True)
+
+        self.blog_post_data_with_tags_str['post_tags'] = 'tag1'
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data_with_tags_str, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_201_CREATED)
+        self.assertEqual(create_post_response2.data['created'], True)
+
+        all_tags_by_post_count_response = self.client.get(all_tags_by_post_count_url)
+        self.assertEqual(all_tags_by_post_count_response.status_code, HTTP_200_OK)
+        self.assertEqual(len(all_tags_by_post_count_response.data['results']), 3)
+        self.assertEqual(all_tags_by_post_count_response.data['results'][0]['name'], 'tag1')
+
+        print('Done.....')
 
     def test_user_can_get_all_next_post_previous_post_choices(self):
         '''
@@ -668,3 +724,5 @@ class PostTestsRead(APITestCase):
         next_previous_choices_response = self.client.get(next_previous_choices_url)
         self.assertEqual(next_previous_choices_response.status_code, HTTP_200_OK)
         self.assertEqual(len(next_previous_choices_response.data['results']), 5)
+
+        print('Done.....')

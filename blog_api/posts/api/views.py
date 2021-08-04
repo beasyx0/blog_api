@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from rest_framework import generics
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
@@ -11,9 +10,10 @@ from rest_framework.throttling import AnonRateThrottle
 from django.db.models import Q, Count, F
 
 from blog_api.posts.models import Tag, Post
-from blog_api.posts.api.serializers import AuthorBookmarkLikedSerializer, NextPostPreviousPostSerializer, TagSerializer, PostSerializer, PostUpdateSerializer
+from blog_api.posts.api.serializers import NextPostPreviousPostSerializer, TagSerializer, PostCreateSerializer, PostDetailSerializer, \
+                                                                                                PostUpdateSerializer, PostOverviewSerializer
 from blog_api.users.models import User
-from blog_api.posts.models import update_post_counts
+from blog_api.users.api.serializers import UserPublicSerializer
 
 
 def get_paginated_queryset(request, qs, serializer_obj, page_size=10):
@@ -34,12 +34,16 @@ def all_posts(request):
     Returns nested representations of all posts. Paginates the quereyset.
     ==========================================================================================================
     '''
-    posts_to_paginate = \
-        Post.objects.prefetch_related('bookmarks')\
-                    .select_related('previouspost').select_related('nextpost')\
+    posts_to_paginate = (
+        Post.objects.prefetch_related('bookmarks')
+                    .prefetch_related('tags')
+                    .select_related('author')
+                    .select_related('previouspost')
+                    .select_related('nextpost')
                     .filter(is_active=True)
+    )
 
-    all_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+    all_posts = get_paginated_queryset(request, posts_to_paginate, PostOverviewSerializer)
 
     return all_posts
 
@@ -56,7 +60,7 @@ def featured_posts(request):
     '''
     featured_posts_to_paginate = Post.items.featured()
 
-    featured_posts = get_paginated_queryset(request, featured_posts_to_paginate, PostSerializer)
+    featured_posts = get_paginated_queryset(request, featured_posts_to_paginate, PostOverviewSerializer)
 
     return featured_posts
 
@@ -73,7 +77,7 @@ def most_liked_posts(request):
     '''
     most_liked_posts_to_paginate = Post.items.most_liked()
 
-    most_liked_posts = get_paginated_queryset(request, most_liked_posts_to_paginate, PostSerializer)
+    most_liked_posts = get_paginated_queryset(request, most_liked_posts_to_paginate, PostOverviewSerializer)
 
     return most_liked_posts
 
@@ -90,7 +94,7 @@ def most_disliked_posts(request):
     '''
     most_disliked_posts_to_paginate = Post.items.most_disliked()
 
-    most_disliked_posts = get_paginated_queryset(request, most_disliked_posts_to_paginate, PostSerializer)
+    most_disliked_posts = get_paginated_queryset(request, most_disliked_posts_to_paginate, PostOverviewSerializer)
 
     return most_disliked_posts
 
@@ -107,7 +111,7 @@ def oldest_posts(request):
     '''
     posts_to_paginate = Post.items.oldest_posts()
 
-    oldest_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+    oldest_posts = get_paginated_queryset(request, posts_to_paginate, PostOverviewSerializer)
 
     return oldest_posts
 
@@ -124,7 +128,7 @@ def most_bookmarked_posts(request):
     '''
     posts_to_paginate = Post.items.most_bookmarked()
 
-    most_bookmarked_posts = get_paginated_queryset(request, posts_to_paginate, PostSerializer)
+    most_bookmarked_posts = get_paginated_queryset(request, posts_to_paginate, PostOverviewSerializer)
 
     return most_bookmarked_posts
 
@@ -142,12 +146,12 @@ def next_previous_posts(request):
     updating = request.data.get('updating', None)
     post_slug = request.data.get('post_slug', None)
 
-    if updating is not None and not post_slug:
+    if updating and not post_slug:
         return Response({
                     'message': 'Please post a valid post slug if updating else exclude the updating keyword.'
                 }, status=HTTP_400_BAD_REQUEST
             )
-    if updating and post_slug:
+    if updating == True and post_slug:
         try:
             post = Post.objects.get(slug=post_slug)
             if not post.is_active:
@@ -159,7 +163,7 @@ def next_previous_posts(request):
                 }, status=HTTP_400_BAD_REQUEST
             )
     else:
-        next_previous_posts_to_paginate = Post.objects.filter(author=request.user, is_active=True)
+        next_previous_posts_to_paginate = Post.objects.filter(author=request.user, is_active=True).only('slug', 'title')
 
     all_next_previous_posts = get_paginated_queryset(request, next_previous_posts_to_paginate, NextPostPreviousPostSerializer, page_size=1000)
 
@@ -186,8 +190,7 @@ def post_create(request):
         If not found or if post is inactive returns 400 and message.
     4) Serialize and attempt to save the serializer. If error returns serializer.errors.
     5) If any post tags were included in the request, adds them to the new post.
-    6) Updates any objects with a post count attribute.
-    7) Returns serialized post.
+    6) Returns serialized post.
     ==========================================================================================================
     '''
     title = request.data.get('title', None)
@@ -199,6 +202,7 @@ def post_create(request):
 
     request.data['author'] = request.user.id  # 2
 
+    next_post = None
     if next_post_slug:
         try:
             next_post = Post.objects.get(slug=next_post_slug)  # 3
@@ -208,10 +212,11 @@ def post_create(request):
         except Post.DoesNotExist:
             return Response({
                     'created': False,
-                    'message': 'No post found with provided next post slug.'
+                    'message': 'No post found with provided next post slug.',
                 }, status=HTTP_400_BAD_REQUEST
             )
 
+    previous_post = None
     if previous_post_slug:
         try:
             previous_post = Post.objects.get(slug=previous_post_slug)
@@ -221,26 +226,31 @@ def post_create(request):
         except Post.DoesNotExist:
             return Response({
                     'created': False,
-                    'message': 'No post found with provided previous post slug.'
+                    'message': 'No post found with provided previous post slug.',
                 }, status=HTTP_400_BAD_REQUEST
             )
 
-    if post_tags:
-        tag_set = Tag.items.comma_to_qs(post_tags)
+    if hasattr(next_post, 'slug') and hasattr(previous_post, 'slug'):
+        if next_post.slug == previous_post.slug:
+            return Response({
+                    'updated': False,
+                    'message': 'Next and previous post can not be same.',
+                }, status=HTTP_400_BAD_REQUEST
+            )
     
-    serializer = PostSerializer(data=request.data)  # 4
+    serializer = PostCreateSerializer(data=request.data)  # 4
     if serializer.is_valid():
         serializer.save()
 
         new_post = Post.objects.get(slug=serializer.data['slug'])
 
         if post_tags:
+            tag_set = Tag.items.comma_to_qs(post_tags)
             new_post.tags.clear()
             new_post.tags.add(*tag_set)  # 5
             new_post.save()
-            
-        update_post_counts([new_post.author])  # 6
-        new_post = PostSerializer(new_post)  # serializer was already saved, have to reserialize to get tags if any
+
+        new_post = PostDetailSerializer(new_post)
         return Response({
                 'created': True,
                 'post': new_post.data  # 7
@@ -284,7 +294,7 @@ def post_detail(request):
                 'message': 'No post found with provided slug.'
             }, status=HTTP_400_BAD_REQUEST
         )
-    serialized_post = PostSerializer(post).data  # 3
+    serialized_post = PostDetailSerializer(post).data  # 3
     return Response({
             'post': serialized_post
         }, status=HTTP_200_OK
@@ -352,16 +362,19 @@ def post_update(request):
             }, status=HTTP_400_BAD_REQUEST
         )
 
+    next_post = None
     if next_post_slug:
         try:
-            next_post_id = Post.objects.get(slug=next_post_slug).id  # 5
-            if next_post_id == post.id:
+            next_post = Post.objects.get(slug=next_post_slug)  # 5
+            if not next_post.is_active:
+                raise Post.DoesNotExist()
+            if next_post.slug == post.slug:
                 return Response({
                         'updated': False,
                         'message': 'Next post cannot be to self.'
                     }, status=HTTP_400_BAD_REQUEST
                 )
-            request.data['nextpost'] = next_post_id
+            request.data['nextpost'] = next_post.id
         except Post.DoesNotExist:
             return Response({
                     'updated': False,
@@ -369,25 +382,33 @@ def post_update(request):
                 }, status=HTTP_400_BAD_REQUEST
             )
 
+    previous_post = None
     if previous_post_slug:
         try:
-            previous_post_id = Post.objects.get(slug=previous_post_slug).id
-            if previous_post_id == post.id:
+            previous_post = Post.objects.get(slug=previous_post_slug)
+            if not previous_post.is_active:
+                raise Post.DoesNotExist()
+            if previous_post.slug == post.slug:
                 return Response({
                         'updated': False,
                         'message': 'Previous post cannot be to self.'
                     }, status=HTTP_400_BAD_REQUEST
                 )
-            request.data['previouspost'] = previous_post_id
+            request.data['previouspost'] = previous_post.id
         except Post.DoesNotExist:
             return Response({
                     'updated': False,
                     'message': 'No post found with provided previous post slug.',
                 }, status=HTTP_400_BAD_REQUEST
             )
-
-    if post_tags:
-        tag_set = Tag.items.comma_to_qs(post_tags)
+    
+    if hasattr(next_post, 'slug') and hasattr(previous_post, 'slug'):
+        if next_post.slug == previous_post.slug:
+            return Response({
+                    'updated': False,
+                    'message': 'Next and previous post can not be same.',
+                }, status=HTTP_400_BAD_REQUEST
+            )        
 
     serializer = PostUpdateSerializer(post, data=request.data, partial=partial)  # 6
 
@@ -397,12 +418,12 @@ def post_update(request):
         updated_post = Post.objects.get(slug=serializer.data['slug'])
 
         if post_tags:
+            tag_set = Tag.items.comma_to_qs(post_tags)
             updated_post.tags.clear()
             updated_post.tags.add(*tag_set)  # 8
             updated_post.save()
-            
-        update_post_counts([updated_post.author])  # 9
-        updated_post = PostSerializer(updated_post)  # serializer was already saved, have to reserialize to get tags if any
+
+        updated_post = PostDetailSerializer(post)  # serializer was already saved, have to reserialize to get tags if any
         return Response({
                 'updated': True,
                 'message': 'Post updated successfully.',
@@ -445,7 +466,9 @@ def post_bookmarks(request):
         )
 
     bookmarks = post.bookmarks.all()
-    all_post_bookmarks = get_paginated_queryset(request, bookmarks, AuthorBookmarkSerializer, page_size=30)
+
+    all_post_bookmarks = get_paginated_queryset(request, bookmarks, UserPublicSerializer, page_size=30)
+
     return all_post_bookmarks
 
 
@@ -546,8 +569,6 @@ def post_delete(request):
     post.is_active = False
     post.save()
 
-    update_post_counts([post.author])
-
     return Response({
             'deleted': True,
             'message': 'Post deleted successfully.'
@@ -588,7 +609,7 @@ def post_search(request):
             }, status=HTTP_400_BAD_REQUEST
         )
 
-    all_posts = get_paginated_queryset(request, search_results, PostSerializer)
+    all_posts = get_paginated_queryset(request, search_results, PostOverviewSerializer)
 
     return all_posts
 
@@ -673,22 +694,6 @@ def post_like(request):
 @api_view(['GET'])
 @permission_classes((AllowAny,))
 @throttle_classes([AnonRateThrottle])
-def all_tags(request):
-    '''
-    --All tags view--
-    ==========================================================================================================
-    Return all tag names and pub_id's.
-    ==========================================================================================================
-    '''
-    tags = Tag.objects.all()
-    all_tags = get_paginated_queryset(request, tags, TagSerializer, page_size=1000)
-    
-    return all_tags
-
-
-@api_view(['GET'])
-@permission_classes((AllowAny,))
-@throttle_classes([AnonRateThrottle])
 def post_likes(request):
     '''
     --All post likes view--
@@ -718,7 +723,7 @@ def post_likes(request):
         )
 
     users_liked = post.likes.users.all()
-    all_users_liked = get_paginated_queryset(request, users_liked, AuthorBookmarkLikedSerializer, page_size=30)
+    all_users_liked = get_paginated_queryset(request, users_liked, UserPublicSerializer, page_size=30)
     return all_users_liked
 
 
@@ -754,8 +759,79 @@ def post_dislikes(request):
         )
 
     users_disliked = post.dislikes.users.all()
-    all_users_disliked = get_paginated_queryset(request, users_disliked, AuthorBookmarkLikedSerializer, page_size=30)
+    all_users_disliked = get_paginated_queryset(request, users_disliked, UserPublicSerializer, page_size=30)
     return all_users_disliked
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def all_tags(request):
+    '''
+    --All tags view--
+    ==========================================================================================================
+    Return all tag names and pub_id's.
+    ==========================================================================================================
+    '''
+    tags = Tag.objects.all()
+    all_tags = get_paginated_queryset(request, tags, TagSerializer, page_size=1000)
+    
+    return all_tags
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def all_tags_by_post_count(request):
+    '''
+    --All tags view--
+    ==========================================================================================================
+    Return all tag names and pub_id's by post count.
+    ==========================================================================================================
+    '''
+    tags = Tag.items.highest_post_count()
+    all_tags_by_post_count = get_paginated_queryset(request, tags, TagSerializer, page_size=1000)
+    
+    return all_tags_by_post_count
+
+
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+@throttle_classes([AnonRateThrottle])
+def all_tag_posts(request):
+    '''
+    --All tags view--
+    ==========================================================================================================
+    Return all posts for a given tag.
+    ==========================================================================================================
+    '''
+    tag_pub_id = request.data.get('tag_pub_id', None)
+    if not tag_pub_id:
+        return Response({
+                'message': 'Please post a valid tag id to get posts for the tag.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        tag = Tag.objects.get(pub_id=tag_pub_id)
+    except Tag.DoesNotExist:
+        return Response({
+                'message': 'No tag found with provided id.'
+            }, status=HTTP_400_BAD_REQUEST
+        )
+
+    tag_posts = (
+        tag.posts.prefetch_related('bookmarks')
+                .prefetch_related('tags')
+                .select_related('author')
+                .select_related('previouspost')
+                .select_related('nextpost')
+                .filter(is_active=True)
+    )
+
+    all_tag_posts = get_paginated_queryset(request, tag_posts, PostOverviewSerializer)
+    
+    return all_tag_posts
 
 
 @api_view(['GET', 'POST', 'PUT', 'PATCH'])

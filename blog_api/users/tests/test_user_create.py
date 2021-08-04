@@ -158,7 +158,7 @@ class UserTestsCreate(APITestCase):
         self.assertEqual(response2.data['registered'], False)
         self.assertEqual(
             response2.data.get('message'), 
-            'A user with those credentials already exists and is inactive. Verification code sent! Check your email.'
+            'A user with that username already exists. Please try again.'
         )
         
         verificaton_data = {'verification_code': VerificationCode.objects.last().verification_code}

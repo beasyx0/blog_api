@@ -1,27 +1,34 @@
-from rest_framework.serializers import ModelSerializer, ValidationError, PrimaryKeyRelatedField, SerializerMethodField, CharField
+from rest_framework.serializers import ModelSerializer, ValidationError, PrimaryKeyRelatedField, SerializerMethodField
 
 from django.db.models import Q, Count, F
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
+from blog_api.users.api.serializers import UserPublicSerializer
 from blog_api.users.models import VerificationCode
 from blog_api.posts.models import Tag, Post
 from blog_api.posts.validators import validate_min_8_words
 
 
-class AuthorBookmarkLikedSerializer(ModelSerializer):
-    
+class AuthorUsernameSerializer(ModelSerializer):
     class Meta:
         model = User
-        fields = [
-            'pub_id', 'username', 'following_count', 'followers_count', 'post_count',
-        ]
+        fields = ['username']
+        read_only_fields = fields
+
+
+class TagNameSerializer(ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['name',]
+        read_only_fields = fields
 
 
 class NextPostPreviousPostSerializer(ModelSerializer):
     class Meta:
         model = Post
         fields = ['slug', 'title',]
+        read_only_fields = fields
 
 
 class TagSerializer(ModelSerializer):
@@ -30,52 +37,21 @@ class TagSerializer(ModelSerializer):
     class Meta:
         model = Tag
         fields = ['pub_id', 'name', 'post_count',]
+        read_only_fields = fields
 
     def get_post_count(self, obj):
-        return obj.posts.all().count()
+        return obj.get_post_count()
 
 
-class PostSerializer(ModelSerializer):
-
-    author = PrimaryKeyRelatedField(allow_null=True, queryset=User.objects.all(), required=False)
-
-    nextpost = \
-        PrimaryKeyRelatedField(
-            allow_null=True, required=False, 
-            queryset=Post.objects.prefetch_related('bookmarks')
-                                    .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
-    )
-    previouspost = \
-        PrimaryKeyRelatedField(
-            allow_null=True, required=False, 
-            queryset=Post.objects.prefetch_related('bookmarks')
-                                    .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
-    )
-
-    tags = TagSerializer(many=True, read_only=True)
+class PostCreateSerializer(ModelSerializer):
 
     class Meta:
         model = Post
         fields = [
-            'slug', 'title', 'author', 'featured',
-            'estimated_reading_time', 'content', 
-            'previouspost', 'nextpost', 'created_at', 
-            'updated_at', 'likes_count', 'dislikes_count', 
-            'score', 'tags',
+            'slug', 'title', 'author', 'featured', 'content', 
+            'previouspost', 'nextpost'
         ]
-        read_only_fields = [
-            'slug', 'estimated_reading_time', 'likes_count', 'dislikes_count', 'score', 
-            'created_at', 'updated_at',
-        ]
-
-    def to_representation(self, instance):
-        '''
-        Nested serializers.
-        '''
-        self.fields['author'] = AuthorBookmarkLikedSerializer()
-        self.fields['nextpost'] = NextPostPreviousPostSerializer()
-        self.fields['previouspost'] = NextPostPreviousPostSerializer() 
-        return super(PostSerializer, self).to_representation(instance)
+        read_only_fields = ['slug',]
 
     def create(self, validated_data):
         '''
@@ -96,50 +72,57 @@ class PostSerializer(ModelSerializer):
 
 class PostUpdateSerializer(ModelSerializer):
 
-    title = SerializerMethodField()
-    estimated_reading_time = SerializerMethodField()
-    
-    nextpost = \
-        PrimaryKeyRelatedField(
-            allow_null=True, required=False, 
-            queryset=Post.objects.prefetch_related('bookmarks')
-                                    .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
-    )
-    previouspost = \
-        PrimaryKeyRelatedField(
-            allow_null=True, required=False, 
-            queryset=Post.objects.prefetch_related('bookmarks')
-                                    .select_related('previouspost').select_related('nextpost').filter(is_active=True), 
-    )
+    class Meta:
+        model = Post
+        fields = ['slug', 'content', 'nextpost', 'previouspost',]
+        read_only_fields = ['slug',]
+
+
+class PostDetailSerializer(ModelSerializer):
+
+    author = UserPublicSerializer(read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+    bookmark_count = SerializerMethodField()
+    likes_count = SerializerMethodField()
+    dislikes_count = SerializerMethodField()
+    like_score = SerializerMethodField()
+    nextpost = NextPostPreviousPostSerializer(read_only=True)
+    previouspost = NextPostPreviousPostSerializer(read_only=True)
 
     class Meta:
         model = Post
         fields = [
-            'slug', 'title', 'author', 'featured',
-            'estimated_reading_time', 'content', 
-            'previouspost', 'nextpost', 'created_at', 
-            'updated_at', 'likes_count', 'dislikes_count', 
-            'score',
+            'slug', 'title', 'author', 'content', 'featured', 'estimated_reading_time', 
+            'previouspost', 'nextpost', 'created_at', 'updated_at', 'bookmark_count', 'likes_count', 
+            'dislikes_count', 'like_score', 'tags',
         ]
-        read_only_fields = [
-            'slug', 'title', 'author', 'estimated_reading_time', 'likes_count', 'dislikes_count', 'score', 
-            'created_at', 'updated_at',
+        read_only_fields = fields
+
+    def get_bookmark_count(self, obj):
+        return obj.get_bookmark_count()
+
+    def get_likes_count(self, obj):
+        return obj.get_likes_count()
+
+    def get_dislikes_count(self, obj):
+        return obj.get_dislikes_count()
+
+    def get_like_score(self, obj):
+        return obj.get_like_score()
+
+
+class PostOverviewSerializer(ModelSerializer):
+    author = AuthorUsernameSerializer(read_only=True)
+    tags = TagNameSerializer(many=True, read_only=True)
+    like_score = SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = [
+            'created_at', 'slug', 'title', 'author', 'featured', 
+            'estimated_reading_time','tags', 'like_score',
         ]
+        read_only_fields = fields
 
-    def get_title(self, obj):
-        return obj.title
-
-    def get_author(self, obj):
-        return obj.author.username
-
-    def get_estimated_reading_time(self, obj):
-        return obj.estimated_reading_time
-
-    def to_representation(self, instance):
-        '''
-        Nested serializers.
-        '''
-        self.fields['author'] = AuthorBookmarkLikedSerializer()
-        self.fields['nextpost'] = NextPostPreviousPostSerializer()
-        self.fields['previouspost'] = NextPostPreviousPostSerializer() 
-        return super(PostUpdateSerializer, self).to_representation(instance)
+    def get_like_score(self, obj):
+        return obj.get_like_score()

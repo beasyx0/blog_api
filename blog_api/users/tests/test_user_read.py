@@ -69,6 +69,47 @@ class UserTestsRead(APITestCase):
         self.assertEqual(user_response.data['user']['username'], self.user_data['username'])
         print('Done.....')
 
+    def test_user_can_get_user_public_details(self):
+        '''
+        Ensure an authenticated user can view the public data of another user.
+        '''
+        print('Testing user can get public data for another user')
+
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        user_url = reverse('user')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg_response2 = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response2.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            self.client.post(verification_url, verificaton_data, format='json')
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        user2 = User.objects.last()
+        user_url_data = {
+            'user_pub_id': user2.pub_id
+        }
+
+        user_response = self.client.get(user_url, user_url_data,format='json')
+        self.assertEqual(user_response.status_code, HTTP_200_OK)
+        self.assertEqual(user_response.data['user']['username'], user2.username)
+        print('Done.....')
+
     def test_user_can_get_own_bookmarks(self):
         '''
         Ensure the user can get a list of his own bookmarks.

@@ -52,6 +52,10 @@ class PostTestsCreate(APITestCase):
             'title': 'A really cool title for some really cool blog post by a really cool developer.',
             'content': '',
         }
+        self.blog_post_data_content_299_chars = {
+            'title': 'A really cool title for some really cool blog post by a really cool developer.',
+            'content': '11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
+        }
 
     def test_authenticated_user_can_create_new_post(self):
         '''
@@ -174,6 +178,43 @@ class PostTestsCreate(APITestCase):
         create_post_response = self.client.post(create_post_url, self.blog_post_data_no_content, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(create_post_response.data['created'], False)
+        print('Done.....')
+
+    def test_user_cannot_create_post_content_not_300_chars(self):
+        '''
+        Ensure a user cannot create a post with content less than 300 chars.
+        '''
+        print('Testing user can not create post no content')
+        register_url = reverse('user-register')
+        verification_url = reverse('user-verify')
+        login_url = reverse('user-login')
+        create_post_url = reverse('post-create')
+
+        reg_response = self.client.post(register_url, self.user_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+        reg2_response = self.client.post(register_url, self.user2_data, format='json')
+        self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+        for vcode in VerificationCode.objects.all():
+            verificaton_data = {
+                'verification_code': vcode.verification_code
+            }
+            verification_response = self.client.post(verification_url, verificaton_data, format='json')
+            self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+        login_data = {
+            'email': self.user_data['email'],
+            'password': self.user_data['password']
+        }
+        new_login = self.client.post(login_url, login_data, format='json')
+        self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+        create_post_response = self.client.post(create_post_url, self.blog_post_data_content_299_chars, format='json')
+        self.assertEqual(create_post_response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(create_post_response.data['created'], False)
+        self.assertEqual(create_post_response.data['message']['content'][0], 'Ensure this value has at least 300 characters (it has 299).')
         print('Done.....')
 
     def test_user_cannot_create_post_no_title(self):
@@ -364,7 +405,7 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(liked_response.data['liked'], True)
         self.assertEqual(liked_response.data['message'], self.user_data['username'] + ' liked ' + post.slug + ' successfully.')
         post.refresh_from_db()
-        self.assertEqual(post.likes_count, 1)
+        self.assertEqual(post.get_likes_count(), 1)
 
         print('Done.....')
 
@@ -412,8 +453,8 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(liked_response.status_code, HTTP_201_CREATED)
         self.assertEqual(liked_response.data['liked'], True)
         post.refresh_from_db()
-        self.assertEqual(post.likes_count, 1)
-        self.assertEqual(post.dislikes_count, 0)
+        self.assertEqual(post.get_likes_count(), 1)
+        self.assertEqual(post.get_dislikes_count(), 0)
         self.assertEqual(post.score, 1)
 
         liked_data['like'] = 'dislike'
@@ -421,8 +462,8 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(liked_response2.status_code, HTTP_201_CREATED)
         self.assertEqual(liked_response2.data['liked'], False)
         post.refresh_from_db()
-        self.assertEqual(post.likes_count, 0)
-        self.assertEqual(post.dislikes_count, 1)
+        self.assertEqual(post.get_likes_count(), 0)
+        self.assertEqual(post.get_dislikes_count(), 1)
         self.assertEqual(post.score, -1)
 
         print('Done.....')
@@ -653,12 +694,13 @@ class PostTestsCreate(APITestCase):
         self.blog_post_data['previouspost'] = post1.slug
         create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response2.status_code, HTTP_400_BAD_REQUEST)
+        print('Done.....')
 
-    def test_user_post_count_updates_creating_new_post(self):
+    def test_user_cannot_create_new_post_previous_post_next_post_same(self):
         '''
-        Ensure a user's post count gets incremented upon creating a new post
+        Ensure a user can not create a new post with previous post and next post the same.
         '''
-        print('Testing user post count increments upon creating new post.')
+        print('Testing user can not create new post with next and previous post the same')
         register_url = reverse('user-register')
         verification_url = reverse('user-verify')
         login_url = reverse('user-login')
@@ -682,14 +724,95 @@ class PostTestsCreate(APITestCase):
         self.assertEqual(new_login.status_code, HTTP_200_OK)
 
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
-
-        user = User.objects.first()
-        self.assertEqual(user.post_count, 0)
         
         create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
         self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
-        self.assertEqual(create_post_response.data['created'], True)
 
-        user.refresh_from_db()
-        self.assertEqual(user.post_count, 1)
+        post1 = Post.objects.latest('created_at')
+
+        self.blog_post_data['previouspost'] = post1.slug
+        self.blog_post_data['nextpost'] = post1.slug
+        create_post_response2 = self.client.post(create_post_url, self.blog_post_data, format='json')
+        self.assertEqual(create_post_response2.status_code, HTTP_400_BAD_REQUEST)
         print('Done.....')
+
+    # def test_user_post_count_updates_creating_new_post(self):
+    #     '''
+    #     Ensure a user's post count gets incremented upon creating a new post
+    #     '''
+    #     print('Testing user post count increments upon creating new post.')
+    #     register_url = reverse('user-register')
+    #     verification_url = reverse('user-verify')
+    #     login_url = reverse('user-login')
+    #     create_post_url = reverse('post-create')
+
+    #     reg_response = self.client.post(register_url, self.user_data, format='json')
+    #     self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+    #     for vcode in VerificationCode.objects.all():
+    #         verificaton_data = {
+    #             'verification_code': vcode.verification_code
+    #         }
+    #         verification_response = self.client.post(verification_url, verificaton_data, format='json')
+    #         self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+    #     login_data = {
+    #         'email': self.user_data['email'],
+    #         'password': self.user_data['password']
+    #     }
+    #     new_login = self.client.post(login_url, login_data, format='json')
+    #     self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+    #     self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+    #     user = User.objects.first()
+    #     self.assertEqual(user.post_count, 0)
+        
+    #     create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+    #     self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+    #     self.assertEqual(create_post_response.data['created'], True)
+
+    #     user.refresh_from_db()
+    #     self.assertEqual(user.post_count, 1)
+    #     print('Done.....')
+
+    # def test_tag_post_count_updates_creating_new_post(self):
+    #     '''
+    #     Ensure a tags post count gets incremented upon creating a new post
+    #     '''
+    #     print('Testing tag post count increments upon creating new post.')
+    #     register_url = reverse('user-register')
+    #     verification_url = reverse('user-verify')
+    #     login_url = reverse('user-login')
+    #     create_post_url = reverse('post-create')
+
+    #     reg_response = self.client.post(register_url, self.user_data, format='json')
+    #     self.assertEqual(reg_response.status_code, HTTP_201_CREATED)
+
+    #     for vcode in VerificationCode.objects.all():
+    #         verificaton_data = {
+    #             'verification_code': vcode.verification_code
+    #         }
+    #         verification_response = self.client.post(verification_url, verificaton_data, format='json')
+    #         self.assertEqual(verification_response.status_code, HTTP_200_OK)
+
+    #     login_data = {
+    #         'email': self.user_data['email'],
+    #         'password': self.user_data['password']
+    #     }
+    #     new_login = self.client.post(login_url, login_data, format='json')
+    #     self.assertEqual(new_login.status_code, HTTP_200_OK)
+
+    #     self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + new_login.data['access'])
+
+    #     tag = Tag.objects.create(name='Atag')
+    #     self.assertEqual(tag.post_count, 0)
+        
+    #     self.blog_post_data['post_tags'] = tag.name
+    #     create_post_response = self.client.post(create_post_url, self.blog_post_data, format='json')
+    #     self.assertEqual(create_post_response.status_code, HTTP_201_CREATED)
+    #     self.assertEqual(create_post_response.data['created'], True)
+
+    #     tag.refresh_from_db()
+    #     self.assertEqual(tag.post_count, 1)
+    #     print('Done.....')

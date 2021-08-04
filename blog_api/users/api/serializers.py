@@ -15,7 +15,6 @@ from blog_api.users.model_validators import validate_3_special_characters_max, v
 
 from blog_api.users.models import UserFollowing
 from blog_api.posts.models import Post
-from blog_api.posts.api.serializers import PostSerializer
 
 User = get_user_model()
 
@@ -182,6 +181,13 @@ class RegisterSerializer(ModelSerializer):
 
 
 class UserSerializer(ModelSerializer):
+    '''
+    User detail and update serializer.
+    '''
+
+    following_count = SerializerMethodField()
+    followers_count = SerializerMethodField()
+    post_count = SerializerMethodField()
 
     class Meta:
         model = User
@@ -190,33 +196,99 @@ class UserSerializer(ModelSerializer):
             'followers_count', 'date_joined', 
         ]
         read_only_fields = [
-            'pub_id', 'email', 'post_count', 'following_count', 'followers_count', 'date_joined',
+            'pub_id', 'email', 'date_joined', 'post_count', 'following_count', 
+            'followers_count',
         ]
+
+    def get_following_count(self, obj):
+        return obj.get_following_count()
+
+    def get_followers_count(self, obj):
+        return obj.get_followers_count()
+
+    def get_post_count(self, obj):
+        return obj.get_post_count()
+
+
+class UserPublicSerializer(ModelSerializer):
+    '''
+    User public detail. Read only. Email excluded.
+    '''
+    following_count = SerializerMethodField()
+    followers_count = SerializerMethodField()
+    post_count = SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'pub_id', 'username', 'name', 'post_count', 'following_count', 
+            'followers_count', 'date_joined', 
+        ]
+        read_only_fields = fields
+
+    def get_following_count(self, obj):
+        return obj.get_following_count()
+
+    def get_followers_count(self, obj):
+        return obj.get_followers_count()
+
+    def get_post_count(self, obj):
+        return obj.get_post_count()
 
 
 class UserFollowingSerializer(ModelSerializer):
-
-    following_username = SerializerMethodField()
+    pub_id = SerializerMethodField()
+    username = SerializerMethodField()
+    followers_count = SerializerMethodField()
+    following_count = SerializerMethodField()
+    post_count = SerializerMethodField()
 
     class Meta:
         model = UserFollowing
-        fields = ('following', 'following_username',)
+        fields = [
+            'pub_id', 'username', 'followers_count', 'following_count', 'post_count'
+        ]
 
-    def get_following_username(self, obj):
+    def get_pub_id(self, obj):
+        return obj.following.pub_id
+
+    def get_username(self, obj):
         return obj.following.username
+
+    def get_followers_count(self, obj):
+        return obj.following.get_followers_count()
+
+    def get_following_count(self, obj):
+        return obj.following.get_following_count()
+
+    def get_post_count(self, obj):
+        return obj.following.get_post_count()
 
 
 class UserFollowersSerializer(ModelSerializer):
-
-    follower = SerializerMethodField()
-    follower_username = SerializerMethodField()
+    pub_id = SerializerMethodField()
+    username = SerializerMethodField()
+    followers_count = SerializerMethodField()
+    following_count = SerializerMethodField()
+    post_count = SerializerMethodField()
 
     class Meta:
         model = UserFollowing
-        fields = ('follower', 'follower_username',)
+        fields = [
+            'pub_id', 'username', 'followers_count', 'following_count', 'post_count'
+        ]
 
-    def get_follower(self, obj):
+    def get_pub_id(self, obj):
         return obj.user.pub_id
 
-    def get_follower_username(self, obj):
+    def get_username(self, obj):
         return obj.user.username
+
+    def get_followers_count(self, obj):
+        return obj.user.get_followers_count()
+
+    def get_following_count(self, obj):
+        return obj.user.get_following_count()
+
+    def get_post_count(self, obj):
+        return obj.user.get_post_count()
